@@ -35,8 +35,7 @@ def webhook():
         return jsonify({'error': 'Internal Server Error'}), 500
 
 if __name__ == '__main__':
-    app.debug = False
-    app.run()
+    app.run(host="0.0.0.0", port=5000)
 
 
 
