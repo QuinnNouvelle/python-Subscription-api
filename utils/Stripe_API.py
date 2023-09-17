@@ -54,9 +54,6 @@ class Stripe_API:
         Returns:
             dict: Json response data turned into a dict.
         """
-
-        print("Here you are in the INVOICE FUNCTION\n")
-        
         response = requests.get(f"https://api.stripe.com/v1/invoices/{invoiceID}", headers=self.headers)
 
         return json.loads(response.text)
