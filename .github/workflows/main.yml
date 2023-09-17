@@ -18,6 +18,3 @@ jobs:
           ssh $SSH_USERNAME@$SERVER_IP
           cd python-Subscription-api
           git pull origin main
-        env:
-          SERVER_IP: ${{ secrets.SERVER_IP }}
-          USERNAME: ${{ secrets.SSH_USERNAME }}
