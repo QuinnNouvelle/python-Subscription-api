@@ -15,6 +15,6 @@ jobs:
 
       - name: Deploy to Server
         run: |
-          ssh "$SSH_USERNAME@$SERVER_IP"
+          ssh ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }}
           cd python-Subscription-api
           git pull origin main
