@@ -34,6 +34,30 @@ def webhook():
         print("Error:", str(e))
         return jsonify({'error': 'Internal Server Error'}), 500
 
+@app.route('/webhook/subscriptions', methods=['POST'])
+def webhookSubscription():
+    event = None
+    payload = request.data
+    sig_header = request.headers['STRIPE_SIGNATURE']
+
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, endpoint_secret
+        )
+    except ValueError as e:
+        # Invalid payload
+        print(f"Invalid payload: {e}")
+        return jsonify({'status': 'error', 'message': 'Invalid payload'}), 400
+    except stripe.error.SignatureVerificationError as e:
+        # Invalid signature
+        print(f"Signature verification error: {e}")
+        return jsonify({'status': 'error', 'message': 'Invalid signature'}), 400
+
+    event_types = set({'customer.subscription.created','customer.subscription.deleted','customer.subscription.updated'})
+    if event['type'] in event_types: 
+        UserSubscriptionPayload = StripeAPI.handleSubscriptionEvent(event)
+        CaspioAPI.mergeUser(UserSubscriptionPayload, '/v2/tables/Python_Dev_TitlePro_PaymentLogs/records')
+
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5000)
 
