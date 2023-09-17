@@ -1,13 +1,15 @@
 from flask import Flask, render_template, request, jsonify
 from werkzeug.middleware.proxy_fix import ProxyFix
+from dotenv import dotenv_values
 
 app = Flask(__name__)
+config = dotenv_values('.env')
 
 # Use ProxyFix to handle reverse proxy headers (when behind a reverse proxy)
 #app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # Replace 'your_secret_token' with your actual secret token
-secret_token = 'SuperSecretToken'
+secret_token = config['testSecretToken']
 
 
 @app.route('/', methods=['GET'])
