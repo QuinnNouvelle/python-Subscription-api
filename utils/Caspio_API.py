@@ -1,20 +1,23 @@
-from dotenv import dotenv_values
+import base64
 import json
 import requests
 
 class Caspio_API:
-    env_file_path = ".env"
-    config = dotenv_values(".env")
+  
+    def __init__(self: object, config):
+        self._config = config
 
-    accessTokenURL = config["accessTokenURL"]
-    cliendID = config["ClientID"]
-    client_secret = config["ClientSecret"]
-    refreshToken = config["refreshToken"]
-    accessToken = config["bearerAccessToken"]
-    api_url = config["apiURL"]
+    @property
+    def config(self: object):
+        return self._config
 
-    def _updateTokens(self, tokens: dict):
-        with open(self.env_file_path, "r") as env_file:
+    @config.setter
+    def config(self: object, config):
+        self._config = config
+
+    def _updateTokens(self: object, tokens: dict):
+
+        with open(self.config['envPath'], "r") as env_file:
             lines = env_file.readlines()
         
         updated_lines = []
@@ -28,15 +31,15 @@ class Caspio_API:
                 updated_lines.append(line)
 
         # Write the modified content back to the file
-        with open(self.env_file_path, "w") as env_file:
+        with open(self.config['envPath'], "w") as env_file:
             env_file.writelines(updated_lines)
 
-        print(f"Variables updated in {self.env_file_path}")
+        self.config = updated_lines
+        print(f"Variables updated in {self.config['envPath']}")
 
-
-    def _getBearerAccessToken(self):
-        postData = f"grant_type=client_credentials&client_id={self.cliendID}&client_secret={self.client_Secret}"
-        response = requests.post(self.accessTokenURL,data=postData)
+    def _getBearerAccessToken(self: object):
+        postData = f"grant_type=client_credentials&client_id={self.config['ClientID']}&client_secret={self.config['ClientSecret']}"
+        response = requests.post(self.config["accessTokenURL"],data=postData)
         if response.status_code == 200:
             jsonData = json.loads(response.text)
             tokens = {
@@ -47,9 +50,8 @@ class Caspio_API:
             
         print(response.text)
         
-
-    def _refreshBearerAccessToken(self):
-        dataToEncode = f"{self.clientID}:{self.client_secret}"
+    def _refreshBearerAccessToken(self: object, config):
+        dataToEncode = f"{config['ClientID']}:{config['ClientSecret']}"
         binaryData = dataToEncode.encode("utf-8")
         encodedData = base64.b64encode(binaryData)
         decodedData = encodedData.decode('utf-8')
@@ -58,31 +60,91 @@ class Caspio_API:
             "Authorization": "Basic " + decodedData
         }
 
-        postData = f"grant_type=refresh_token&refresh_token={self.refreshToken}"
+        postData = f"grant_type=refresh_token&refresh_token={config['refreshToken']}"
         
-        response = requests.post(self.accessTokenURL,data=postData, headers=headers)
+        response = requests.post(config["accessTokenURL"],data=postData, headers=headers)
 
         if (response.status_code == 401):
             ## get new bearer access token and refresh token
-            getBearerAccessToken()
-            refreshBearerAccessToken(self.clientID, self.client_secret, self.refreshToken)
+            self._getBearerAccessToken(self.config)
+            self._refreshBearerAccessToken(self)
         if (response.status_code == 200):
+            responseDict = json.loads(response.text)
+            print(response.text)
             tokens = {
-                "bearerAccessToken": jsonData["access_token"]
+                "bearerAccessToken": responseDict['access_token']
             }
-            updateTokens(tokens)
+            self._updateTokens(tokens)
 
 
         print(response.text)
         
-
-    def get(self, endpoint: str):
+    def get(self: object, endpoint: str) -> object:
         headers = {
-            "Authorization": "bearer " + self.accessToken,
+            "Authorization": f"bearer {self.config['bearerAccessToken']}",
             "Content-Type": "application/json"
         }
-        response = requests.get(self.api_url + endpoint,headers=headers)
+        response = requests.get(self.config["apiURL"] + endpoint,headers=headers)
         if response.status_code == 401:
-            refreshBearerAccessToken()
-            getCaspio(endpoint, self.accessToken)
-        return json.loads(response.text)
+            self._refreshBearerAccessToken(self.config)
+            self.get(endpoint)
+        #print(f"{response.status_code}: {response.text}")
+        return response
+
+    def put(self: object, endpoint: str, data, qWhere: str) -> object:
+        headers = {
+            "Authorization": f"bearer {self.config['bearerAccessToken']}",
+            "Content-Type": "application/json"
+        }
+        JSONData = json.dumps(data)
+        print(f"{JSONData}\n")
+        print(f"{self.config['apiURL']}{endpoint}?q.where={qWhere}")
+
+        response = requests.put(f"{self.config['apiURL']}{endpoint}?q.where={qWhere}",headers=headers, data=JSONData)
+        if response.status_code == 401:
+            self._refreshBearerAccessToken(self.config)
+            self.put(endpoint, data)
+        print(f"{response.status_code}: {response.text}")
+        if response.status_code == 200:
+            print(f"Successfully Updated row: {qWhere}, With Data: {data}")
+        return response
+
+    def post(self: object, endpoint: str, data: dict) -> object:
+        headers = {
+            "Authorization": f"bearer {self.config['bearerAccessToken']}",
+            "Content-Type": "application/json"
+        }
+        JSONData = json.dumps(data)
+        response = requests.post(self.config["apiURL"] + endpoint,headers=headers, data=JSONData)
+        if response.status_code == 401:
+            self._refreshBearerAccessToken(self.config)
+            self.post(endpoint, data)
+        print(f"{response.status_code}: {response.text}")
+        return response
+
+    def delete(self: object, endpoint: str) -> object:
+        headers = {
+            "Authorization": f"bearer {self.config['bearerAccessToken']}",
+            "Content-Type": "application/json"
+        }
+        response = requests.delete(self.config["apiURL"] + endpoint,headers=headers)
+        if response.status_code == 401:
+            self._refreshBearerAccessToken(self.config)
+            self.delete(endpoint)
+        print(f"{response.status_code}: {response.text}")
+        return response
+
+    def mergeUser(self: object, data: dict, endpoint: str):
+        # Get All Records From A Table
+        response = self.get(endpoint)
+        recordsDict = json.loads(response.text)
+
+        # Iterate Through Those Records
+        for record in recordsDict['Result']:
+            if data['Email'] == record['Email']:
+                del data["Email"]
+                response = self.put(endpoint, data, f"PaymentID={record['PaymentID']}")
+                return response
+        response = self.post(endpoint, data)
+        print(f'Successfully Created A new User with Data: {data}')
+        return response

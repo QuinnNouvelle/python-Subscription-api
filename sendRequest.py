@@ -1,6 +1,6 @@
 import requests
 
-url = "http://127.0.0.1:5000/webhook"
+url = "https://nouvelletechdemo.com/webhook"
 
 headers = {
     "Content-Type": "application/json",
