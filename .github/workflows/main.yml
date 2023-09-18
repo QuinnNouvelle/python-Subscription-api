@@ -17,7 +17,10 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H ${{ secrets.SSH_HOST }} > ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
+
+      - name: Add keys to Arbiter
+        run: ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "eval $(ssh-agent -s) ssh-add .ssh/github_ed25519
       
       - name: Deploy to Server
-        run: ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "cd .ssh && eval $(ssh-agent -s) sudo ssh-add github_ed25519 && exit"
+        run: ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "cd ${{ secrets.WORK_DIR }} && git pull origin main && exit"
     
