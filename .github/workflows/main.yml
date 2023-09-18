@@ -22,7 +22,7 @@ jobs:
           chmod 644 ~/.ssh/known_hosts
 
       - name: Try SSH Keys
-        run: ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "eval $(ssh-agent -s) ssh-add ~/.ssh/github_ed25519 "
+        run: ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} 'eval $(ssh-agent -s) echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519 ssh-add ~/.ssh/id_ed25519'
       
       - name: Deploy to Server
         run: ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "cd ${{ secrets.WORK_DIR }} && git checkout ${{ secrets.MAIN_BRANCH }} && git pull && exit"
