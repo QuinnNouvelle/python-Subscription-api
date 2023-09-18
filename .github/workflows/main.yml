@@ -19,7 +19,7 @@ jobs:
           chmod 644 ~/.ssh/known_hosts
 
       - name: Add keys to Arbiter
-        run: ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} 'eval $(ssh-agent -s) sleep 1 && ssh-add ~/.ssh/github_ed25519'
+        run: ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "eval $(ssh-agent -s) sleep 1 && ssh-add ~/.ssh/github_ed25519"
       
       - name: Deploy to Server
         run: ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "cd ${{ secrets.WORK_DIR }} && git pull origin main && exit"
