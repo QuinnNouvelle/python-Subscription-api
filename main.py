@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, jsonify
 from werkzeug.middleware.proxy_fix import ProxyFix
 import logging
 from dotenv import dotenv_values
+import stripe
 
 app = Flask(__name__)
 config = dotenv_values('.env')
