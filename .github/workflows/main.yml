@@ -21,8 +21,10 @@ jobs:
           ssh-keyscan -H ${{ secrets.SSH_HOST }} > ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
 
-      - name: Add SSH Key For USer
-        run: ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "eval $(ssh-agent -s) && ssh-add .ssh/github_ed25519"
+      - name: Start SSH Agent
+        run: ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "eval $(ssh-agent -s)"
+      - name: Add SSH Key To Agent
+        run: ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "ssh-add .ssh/github_ed25519"
       
       - name: Deploy to Server
         run: ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "cd ${{ secrets.WORK_DIR }} && git checkout ${{ secrets.MAIN_BRANCH }} && git pull && exit"
