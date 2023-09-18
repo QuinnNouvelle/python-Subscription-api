@@ -3,6 +3,8 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 import logging
 from dotenv import dotenv_values
 import stripe
+from utils.Stripe_API import Stripe_API
+from utils.Caspio_API import Caspio_API
 
 app = Flask(__name__)
 config = dotenv_values('.env')
