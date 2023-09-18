@@ -22,5 +22,5 @@ jobs:
           chmod 644 ~/.ssh/known_hosts
       
       - name: Deploy to Server
-        run: ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "ls -a && exit"
+        run: ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "cd .ssh && ls -al && exit"
     
