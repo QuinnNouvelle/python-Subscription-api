@@ -6,6 +6,9 @@ import stripe
 
 app = Flask(__name__)
 config = dotenv_values('.env')
+stripe.api_key = config["stripeSecretKey"]
+endpoint_secret = config["signingSecret"]
+
 
 gunicorn_logger = logging.getLogger('gunicorn.error')
 app.logger.handlers = gunicorn_logger.handlers
