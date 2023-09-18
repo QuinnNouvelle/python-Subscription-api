@@ -14,10 +14,8 @@ gunicorn_logger = logging.getLogger('gunicorn.error')
 app.logger.handlers = gunicorn_logger.handlers
 app.logger.setLevel(gunicorn_logger.level)
 
-
-
-# Use ProxyFix to handle reverse proxy headers (when behind a reverse proxy)
-#app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+StripeAPI = Stripe_API(config)
+CaspioAPI = Caspio_API(config)
 
 # Replace 'your_secret_token' with your actual secret token
 secret_token = config['testSecretToken']
