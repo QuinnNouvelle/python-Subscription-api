@@ -22,5 +22,5 @@ jobs:
           chmod 644 ~/.ssh/known_hosts
       
       - name: Deploy to Server
-        run: ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "eval $(ssh-agent -s) ssh-add ~/.ssh/github_ed25519 cd ${{ secrets.WORK_DIR }} && git pull origin main && exit"
+        run: ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "eval $(ssh-agent -s) ssh-add .ssh/github_ed25519 && cd ${{ secrets.WORK_DIR }} && git pull origin main && exit"
     
