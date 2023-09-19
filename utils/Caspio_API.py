@@ -35,7 +35,7 @@ class Caspio_API:
             env_file.writelines(updated_lines)
 
         self.config = updated_lines
-        print(f"Variables updated in {self.config['envPath']}")
+        print(f"Variables updated in .env")
 
     def _getBearerAccessToken(self: object):
         postData = f"grant_type=client_credentials&client_id={self.config['ClientID']}&client_secret={self.config['ClientSecret']}"
@@ -46,12 +46,12 @@ class Caspio_API:
                 "bearerAccessToken": jsonData["access_token"],
                 "refreshToken": jsonData["refresh_token"]
             }
-            updateTokens(tokens)
+            self._updateTokens(tokens)
             
-        print(response.text)
+        return response
         
-    def _refreshBearerAccessToken(self: object, config):
-        dataToEncode = f"{config['ClientID']}:{config['ClientSecret']}"
+    def _refreshBearerAccessToken(self: object):
+        dataToEncode = f"{self.config['ClientID']}:{self.config['ClientSecret']}"
         binaryData = dataToEncode.encode("utf-8")
         encodedData = base64.b64encode(binaryData)
         decodedData = encodedData.decode('utf-8')
@@ -60,14 +60,14 @@ class Caspio_API:
             "Authorization": "Basic " + decodedData
         }
 
-        postData = f"grant_type=refresh_token&refresh_token={config['refreshToken']}"
+        postData = f"grant_type=refresh_token&refresh_token={self.config['refreshToken']}"
         
-        response = requests.post(config["accessTokenURL"],data=postData, headers=headers)
+        response = requests.post(self.config["accessTokenURL"],data=postData, headers=headers)
 
         if (response.status_code == 401):
             ## get new bearer access token and refresh token
-            self._getBearerAccessToken(self.config)
-            self._refreshBearerAccessToken(self)
+            self._getBearerAccessToken()
+            self._refreshBearerAccessToken()
         if (response.status_code == 200):
             responseDict = json.loads(response.text)
             print(response.text)
@@ -86,7 +86,7 @@ class Caspio_API:
         }
         response = requests.get(self.config["apiURL"] + endpoint,headers=headers)
         if response.status_code == 401:
-            self._refreshBearerAccessToken(self.config)
+            self._refreshBearerAccessToken()
             self.get(endpoint)
         #print(f"{response.status_code}: {response.text}")
         return response
@@ -102,7 +102,7 @@ class Caspio_API:
 
         response = requests.put(f"{self.config['apiURL']}{endpoint}?q.where={qWhere}",headers=headers, data=JSONData)
         if response.status_code == 401:
-            self._refreshBearerAccessToken(self.config)
+            self._refreshBearerAccessToken()
             self.put(endpoint, data)
         print(f"{response.status_code}: {response.text}")
         if response.status_code == 200:
@@ -117,7 +117,7 @@ class Caspio_API:
         JSONData = json.dumps(data)
         response = requests.post(self.config["apiURL"] + endpoint,headers=headers, data=JSONData)
         if response.status_code == 401:
-            self._refreshBearerAccessToken(self.config)
+            self._refreshBearerAccessToken()
             self.post(endpoint, data)
         print(f"{response.status_code}: {response.text}")
         return response
@@ -129,7 +129,7 @@ class Caspio_API:
         }
         response = requests.delete(self.config["apiURL"] + endpoint,headers=headers)
         if response.status_code == 401:
-            self._refreshBearerAccessToken(self.config)
+            self._refreshBearerAccessToken()
             self.delete(endpoint)
         print(f"{response.status_code}: {response.text}")
         return response
