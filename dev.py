@@ -1,26 +1,32 @@
-import json
-import os
-import stripe
-import requests
+from flask import Flask, render_template, request, jsonify
+from werkzeug.middleware.proxy_fix import ProxyFix
+import logging
 from dotenv import dotenv_values
+import stripe
 from utils.Stripe_API import Stripe_API
 from utils.Caspio_API import Caspio_API
 
-from flask import Flask, jsonify, request
-
-config = dotenv_values(".env")
-
 app = Flask(__name__)
+config = dotenv_values('.env')
+stripe.api_key = config["stripeSecretKey"]
+endpoint_secret = config["signingSecret"]
+
+
+gunicorn_logger = logging.getLogger('gunicorn.error')
+app.logger.handlers = gunicorn_logger.handlers
+app.logger.setLevel(gunicorn_logger.level)
 
 StripeAPI = Stripe_API(config)
 CaspioAPI = Caspio_API(config)
 
-endpoint_secret = 'whsec_d07e3db61c55e1b808a9330eafa081b8386d7958aa5e059260f5e34f50d41c65'
-
+# Replace 'your_secret_token' with your actual secret token
 secret_token = config['testSecretToken']
 
-stripe.api_key = config["stripeSecretKey"]
+endpoint_secret = "whsec_d07e3db61c55e1b808a9330eafa081b8386d7958aa5e059260f5e34f50d41c65"
 
+@app.route('/', methods=['GET'])
+def homePage():
+    return render_template('index.html')
 
 @app.route('/webhook/subscriptions', methods=['POST'])
 def webhookSubscription():
@@ -44,28 +50,8 @@ def webhookSubscription():
     event_types = set({'customer.subscription.created','customer.subscription.deleted','customer.subscription.updated'})
     if event['type'] in event_types: 
         UserSubscriptionPayload = StripeAPI.handleSubscriptionEvent(event)
-        CaspioAPI.mergeUser(UserSubscriptionPayload, '/v2/tables/Python_Dev_TitlePro_PaymentLogs/records')
-        
-    return jsonify(success=True)
-
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    received_token = request.headers.get('X-Secret-Token')
-
-    if received_token != secret_token:
-        return jsonify({'error': 'Unauthorized'}), 401
-
-    try:
-        data = request.json  # Parse JSON data sent by the webhook provider
-    except:
-        data = ""
-
-    # Process the webhook data here (e.g., save it to a database or perform some action)
-    try:
-        return jsonify({'message': 'Webhook received successfully'}), 200
-
-    except Exception as e:
-        print("Error:", str(e))
-        return jsonify({'error': 'Internal Server Error'}), 500
+        response = CaspioAPI.mergeUser(UserSubscriptionPayload)
+        return jsonify({'status': 'accepted', 'message': 'Event Successfully Triggered.'}), response.status_code
+    return jsonify({'status': 'accepted', 'message': 'Event Successfully Triggered.'}), 200
 
 app.run(host="127.0.0.1", port=4242)

@@ -72,7 +72,7 @@ def webhookSubscription():
     event_types = set({'customer.subscription.created','customer.subscription.deleted','customer.subscription.updated'})
     if event['type'] in event_types: 
         UserSubscriptionPayload = StripeAPI.handleSubscriptionEvent(event)
-        CaspioAPI.mergeUser(UserSubscriptionPayload, '/v2/tables/Python_Dev_TitlePro_PaymentLogs/records')
+        CaspioAPI.mergeUser(UserSubscriptionPayload)
 
 
 if __name__ == '__main__':

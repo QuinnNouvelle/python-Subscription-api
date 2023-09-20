@@ -16,6 +16,13 @@ class Caspio_API:
         self._config = config
 
     def _updateTokens(self: object, tokens: dict):
+        """Private Function.  Used to update the .env file.  Only updates the key:value 
+        pair specified in 'tokens'.
+
+        Args:
+            self (object): Caspio_API Instance.
+            tokens (dict): Key:Value Pairs of tokens that need updated.
+        """
 
         with open(self.config['envPath'], "r") as env_file:
             lines = env_file.readlines()
@@ -35,9 +42,18 @@ class Caspio_API:
             env_file.writelines(updated_lines)
 
         self.config = updated_lines
-        print(f"Variables updated in {self.config['envPath']}")
+        print(f"Variables updated in .env")
 
-    def _getBearerAccessToken(self: object):
+    def _getBearerAccessToken(self: object) -> object:
+        """Private Function. Requests BearerAccessToken from Caspio.
+        Only Updates .env variables when response.status_code = 200.
+        Args:
+            self (object): Caspio_API Instance.
+
+        Returns:
+            object: Response Object of post request.
+        """
+
         postData = f"grant_type=client_credentials&client_id={self.config['ClientID']}&client_secret={self.config['ClientSecret']}"
         response = requests.post(self.config["accessTokenURL"],data=postData)
         if response.status_code == 200:
@@ -46,12 +62,17 @@ class Caspio_API:
                 "bearerAccessToken": jsonData["access_token"],
                 "refreshToken": jsonData["refresh_token"]
             }
-            updateTokens(tokens)
+            self._updateTokens(tokens)
             
-        print(response.text)
+        return response
         
-    def _refreshBearerAccessToken(self: object, config):
-        dataToEncode = f"{config['ClientID']}:{config['ClientSecret']}"
+    def _refreshBearerAccessToken(self: object):
+        """Private Function.  Uses the Caspio Refresh token to refresh the Caspio Bearer Access Token. 
+        https://howto.caspio.com/web-services-api/rest-api/authenticating-rest/
+        Args:
+            self (object): Caspio_API Instance.
+        """
+        dataToEncode = f"{self.config['ClientID']}:{self.config['ClientSecret']}"
         binaryData = dataToEncode.encode("utf-8")
         encodedData = base64.b64encode(binaryData)
         decodedData = encodedData.decode('utf-8')
@@ -60,14 +81,15 @@ class Caspio_API:
             "Authorization": "Basic " + decodedData
         }
 
-        postData = f"grant_type=refresh_token&refresh_token={config['refreshToken']}"
+        postData = f"grant_type=refresh_token&refresh_token={self.config['refreshToken']}"
         
-        response = requests.post(config["accessTokenURL"],data=postData, headers=headers)
+        response = requests.post(self.config["accessTokenURL"],data=postData, headers=headers)
 
         if (response.status_code == 401):
             ## get new bearer access token and refresh token
-            self._getBearerAccessToken(self.config)
-            self._refreshBearerAccessToken(self)
+            self._getBearerAccessToken()
+            self._refreshBearerAccessToken()
+            return
         if (response.status_code == 200):
             responseDict = json.loads(response.text)
             print(response.text)
@@ -80,18 +102,40 @@ class Caspio_API:
         print(response.text)
         
     def get(self: object, endpoint: str) -> object:
+        """Simple GET Request to Caspio API.
+
+        Args:
+            self (object): Caspio_API Instance.
+            endpoint (str): endpoint of GET request.
+
+        Returns:
+            object: GET response object.
+        """
         headers = {
             "Authorization": f"bearer {self.config['bearerAccessToken']}",
             "Content-Type": "application/json"
         }
         response = requests.get(self.config["apiURL"] + endpoint,headers=headers)
         if response.status_code == 401:
-            self._refreshBearerAccessToken(self.config)
+            self._refreshBearerAccessToken()
             self.get(endpoint)
         #print(f"{response.status_code}: {response.text}")
+        print(type(response))
         return response
 
-    def put(self: object, endpoint: str, data, qWhere: str) -> object:
+    def put(self: object, endpoint: str, data: dict, qWhere: str) -> object:
+        """Simple PUT request.  Requires data in a dict of values changed, 
+        and an identifier for the row being changed.
+
+        Args:
+            self (object): Caspio_API Instance.
+            endpoint (str): url endpoint of put request.
+            data (dict): Key:Value pairs of the information being updated.
+            qWhere (str): Identifier for the line being changed ex: qWhere = f"PaymentID={record['PaymentID']}".
+
+        Returns:
+            object: PUT request response object.
+        """
         headers = {
             "Authorization": f"bearer {self.config['bearerAccessToken']}",
             "Content-Type": "application/json"
@@ -102,7 +146,7 @@ class Caspio_API:
 
         response = requests.put(f"{self.config['apiURL']}{endpoint}?q.where={qWhere}",headers=headers, data=JSONData)
         if response.status_code == 401:
-            self._refreshBearerAccessToken(self.config)
+            self._refreshBearerAccessToken()
             self.put(endpoint, data)
         print(f"{response.status_code}: {response.text}")
         if response.status_code == 200:
@@ -110,6 +154,16 @@ class Caspio_API:
         return response
 
     def post(self: object, endpoint: str, data: dict) -> object:
+        """Simple POST request to specified endpoint.
+
+        Args:
+            self (object): Caspio_API Instance
+            endpoint (str): url endpoint of POST request.
+            data (dict): Dictionary of data passed into the POST request.
+
+        Returns:
+            object: POST request response object.
+        """
         headers = {
             "Authorization": f"bearer {self.config['bearerAccessToken']}",
             "Content-Type": "application/json"
@@ -117,34 +171,56 @@ class Caspio_API:
         JSONData = json.dumps(data)
         response = requests.post(self.config["apiURL"] + endpoint,headers=headers, data=JSONData)
         if response.status_code == 401:
-            self._refreshBearerAccessToken(self.config)
+            self._refreshBearerAccessToken()
             self.post(endpoint, data)
         print(f"{response.status_code}: {response.text}")
         return response
 
-    def delete(self: object, endpoint: str) -> object:
+    def delete(self: object, endpoint: str, qWhere: str) -> object:
+        """Simple DEL request to specified endpoint.
+
+        Args:
+            self (object): Caspio_API Instance
+            endpoint (str): url endpoint of DEL request.
+
+        Returns:
+            object: DEL request response object.
+        """
         headers = {
             "Authorization": f"bearer {self.config['bearerAccessToken']}",
             "Content-Type": "application/json"
         }
-        response = requests.delete(self.config["apiURL"] + endpoint,headers=headers)
+        response = requests.delete(f"{self.config['apiURL']}{endpoint}?q.where={qWhere}",headers=headers)
         if response.status_code == 401:
-            self._refreshBearerAccessToken(self.config)
+            self._refreshBearerAccessToken()
             self.delete(endpoint)
         print(f"{response.status_code}: {response.text}")
         return response
 
-    def mergeUser(self: object, data: dict, endpoint: str):
+    def mergeUser(self: object, data: dict) -> object:
+        """Attempts to find user for the new data being submitted via email.
+        If email is found the row is updated with information in the dict.
+        If no email exists in Caspio Table then create a new record in that table with data.
+
+        Args:
+            self (object): Caspio_API Instance.
+            data (dict): Key:Value information for user.
+
+        Returns:
+            object: request response object.
+        """
         # Get All Records From A Table
+        endpoint = '/v2/tables/Python_Dev_TitlePro_PaymentLogs/records'
         response = self.get(endpoint)
         recordsDict = json.loads(response.text)
 
-        # Iterate Through Those Records
+        # Iterate Through Those Records and update data
         for record in recordsDict['Result']:
             if data['Email'] == record['Email']:
                 del data["Email"]
-                response = self.put(endpoint, data, f"PaymentID={record['PaymentID']}")
+                response = self.put(endpoint, data, f"PK_ID={record['PK_ID']}")
                 return response
+        # If email does not exists on Caspio, post a new user.
         response = self.post(endpoint, data)
         print(f'Successfully Created A new User with Data: {data}')
         return response
