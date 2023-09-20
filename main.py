@@ -72,8 +72,10 @@ def webhookSubscription():
     event_types = set({'customer.subscription.created','customer.subscription.deleted','customer.subscription.updated'})
     if event['type'] in event_types: 
         UserSubscriptionPayload = StripeAPI.handleSubscriptionEvent(event)
-        CaspioAPI.mergeUser(UserSubscriptionPayload)
-
+        response = CaspioAPI.mergeUser(UserSubscriptionPayload)
+        return jsonify({'status': 'accepted', 'message': 'Event Successfully Triggered.'}), response.status_code
+    
+    return jsonify({'status': 'accepted', 'message': 'Webhook Accepted'}), 200
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5000, debug=True)

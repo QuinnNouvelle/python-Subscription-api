@@ -52,6 +52,6 @@ def webhookSubscription():
         UserSubscriptionPayload = StripeAPI.handleSubscriptionEvent(event)
         response = CaspioAPI.mergeUser(UserSubscriptionPayload)
         return jsonify({'status': 'accepted', 'message': 'Event Successfully Triggered.'}), response.status_code
-    return jsonify({'status': 'accepted', 'message': 'Event Successfully Triggered.'}), 200
+    return jsonify({'status': 'accepted', 'message': 'Webhook Accepted'}), 200
 
 app.run(host="127.0.0.1", port=4242)
