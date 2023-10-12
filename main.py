@@ -122,7 +122,8 @@ def dispositionProSubscriptions():
     StripeAPI = Stripe_API(config=config, secretKey=config["stripeDispositionProSecretKeyDev"])
     CaspioAPI = Caspio_API(config=config)
     stripe.api_key = config["stripeDispositionProSecretKeyDev"]
-    endpoint_secret = config["dispositionProEndpointSecret"]
+    endpoint_secret = config["dispositionProStripeTestWebhookSigningSecret"]
+    caspioEndpoint = '/v2/tables/Python_DP_PaymentLogs/records'
     event = None
     payload = request.data
     sig_header = request.headers['STRIPE_SIGNATURE']
@@ -160,7 +161,7 @@ def dispositionProSubscriptions():
         
         response = mergeUser(
             data=UserPayload, 
-            endpoint='/v2/tables/Python_DP_PaymentLogs/records', 
+            endpoint=caspioEndpoint, 
             caspioAPI=CaspioAPI, 
             stripeAPI=StripeAPI
         )
@@ -186,7 +187,7 @@ def dispositionProSubscriptions():
 
             response = mergeUser(
                 data=UserPayload,
-                endpoint='/v2/tables/Python_DP_PaymentLogs/records',
+                endpoint=caspioEndpoint,
                 caspioAPI=CaspioAPI,
                 stripeAPI=StripeAPI
             )
