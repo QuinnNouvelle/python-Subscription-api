@@ -3,7 +3,6 @@ import requests
 import json
 from flask import current_app
 from dataclasses import dataclass
-from .models.PaymentLogs import PaymentLogs
 
 # The library needs to be configured with your account's secret key.
     # Ensure the key is kept out of any version control system you might be using.
@@ -115,14 +114,6 @@ class Stripe_API:
             
 
         print(f"Amount: {invoiceObject['total']}\nTotalAmount: {totalAmount}\nPreviousAmount: {invoiceObject['lines']['data'][0]['quantity']}")
-
-        paymentLog = PaymentLogs(
-            Email = str(invoiceObject['customer_email'] or 'Error@NoEmailPresent.sad'),
-            CustomerID = subscriptionObject['customer'],
-            UnitsPurchased = subscriptionObject['quantity'],
-            Reason = f"{invoiceObject['billing_reason']} {str(subscriptionObject['cancellation_details']['reason'] or '')}",
-            Status = subscriptionObject['status']
-        )
 
         relaventPayload = {
             "Email": str(invoiceObject['customer_email'] or 'Error@NoEmailPresent.sad'),
