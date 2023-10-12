@@ -6,10 +6,7 @@ from flask import current_app
 class Caspio_API:
   
     def __init__(self: object, config):
-        if isinstance(config, dict):
-            self._config = config
-        else:
-            raise ValueError
+        self._config = config
 
     @property
     def config(self: object):
@@ -17,10 +14,7 @@ class Caspio_API:
 
     @config.setter
     def config(self: object, config):
-        if isinstance(config, dict):
-            self._config = config
-        else:
-            raise ValueError
+        self._config = config
 
     def _updateTokens(self: object, tokens: dict):
         """Private Function.  Used to update the .env file.  Only updates the key:value 
