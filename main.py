@@ -180,7 +180,7 @@ def dispositionProSubscriptions():
             subscriptionObject = StripeAPI.getSubscriptionObject(invoiceObject['subscription'])
 
             UserPayload = {
-                'Email': invoiceObject['customer_email'],
+                'Email': str(invoiceObject['customer_email'] or 'Error@NoEmailPresent.sad'),
                 'CustomerID': invoiceObject['customer'],
                 'UnitsPurchased': subscriptionObject['quantity'],
                 'Status': subscriptionObject['status']
