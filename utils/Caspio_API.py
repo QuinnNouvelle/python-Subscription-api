@@ -1,11 +1,16 @@
 import base64
 import json
 import requests
+from flask import current_app
+from .models.PaymentLogs import PaymentLogs
 
 class Caspio_API:
   
     def __init__(self: object, config):
-        self._config = config
+        if isinstance(config, dict):
+            self._config = config
+        else:
+            raise ValueError
 
     @property
     def config(self: object):
@@ -13,7 +18,10 @@ class Caspio_API:
 
     @config.setter
     def config(self: object, config):
-        self._config = config
+        if isinstance(config, dict):
+            self._config = config
+        else:
+            raise ValueError
 
     def _updateTokens(self: object, tokens: dict):
         """Private Function.  Used to update the .env file.  Only updates the key:value 
@@ -197,7 +205,7 @@ class Caspio_API:
         print(f"{response.status_code}: {response.text}")
         return response
 
-    def mergeUser(self: object, data: dict) -> object:
+    def mergeUser(self: object, data: dict, endpoint: str) -> object:
         """Attempts to find user for the new data being submitted via email.
         If email is found the row is updated with information in the dict.
         If no email exists in Caspio Table then create a new record in that table with data.
@@ -205,22 +213,32 @@ class Caspio_API:
         Args:
             self (object): Caspio_API Instance.
             data (dict): Key:Value information for user.
+            endpoint (str): endpoint url of the table you want to affect
 
         Returns:
             object: request response object.
         """
-        # Get All Records From A Table
-        endpoint = '/v2/tables/Python_Dev_TitlePro_PaymentLogs/records'
+        # Get All Records From A Table 
+        #print(paymentLog)
         response = self.get(endpoint)
         recordsDict = json.loads(response.text)
 
         # Iterate Through Those Records and update data
         for record in recordsDict['Result']:
-            if data['Email'] == record['Email']:
-                del data["Email"]
+            if data['CustomerID'] == record['CustomerID']:
+                #del data["CustomerID"]
                 response = self.put(endpoint, data, f"PK_ID={record['PK_ID']}")
+                if response.status_code == 201 or response.status_code == 200:
+                    print(f'Successfully Updated user {record["Email"]} with Data: {data}')
+                else: 
+                    print(response.status_code)
+                    print(f'ERROR: User {record["Email"]} with Data: {data} Is not updated in the database\nResponse: {response.text}')
                 return response
         # If email does not exists on Caspio, post a new user.
         response = self.post(endpoint, data)
-        print(f'Successfully Created A new User with Data: {data}')
+        if response.status_code == 201:
+            print(response.status_code)
+            print(f'Successfully Created A new User with Data: {data}')
+        else:
+            print(f"{response.status_code} {response.text}")
         return response

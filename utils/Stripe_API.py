@@ -1,7 +1,9 @@
 import stripe
 import requests
 import json
-
+from flask import current_app
+from dataclasses import dataclass
+from .models.PaymentLogs import PaymentLogs
 
 # The library needs to be configured with your account's secret key.
     # Ensure the key is kept out of any version control system you might be using.
@@ -10,9 +12,9 @@ class Stripe_API:
     # This is your Stripe CLI webhook secret for testing your endpoint locally.
     endpoint_secret = 'whsec_d07e3db61c55e1b808a9330eafa081b8386d7958aa5e059260f5e34f50d41c65'
 
-    def __init__(self, config):
+    def __init__(self, config, secretKey):
         self.config = config
-        self.headers = { "Authorization": f"Bearer {config['localStripeSecret']}"}
+        self.headers = { "Authorization": f"Bearer {secretKey}"}
 
     def get(self, endpoint: str):
         """Perform a get request to endpoint
@@ -36,7 +38,7 @@ class Stripe_API:
         Returns:
             dict: Json response data turned into a dict.
         """
-        print("Here you are in the SUBSCRIPTION FUNCTION\n")
+        print("Running: getSubscriptionObject()\n")
         
 
         response = requests.get(f"https://api.stripe.com/v1/subscriptions/{subscriptionID}", headers=self.headers)
@@ -59,7 +61,7 @@ class Stripe_API:
         return json.loads(response.text)
 
     def handleSubscriptionEvent(self, event: dict):
-        print(f"Handling event type: {event['type']}")
+        current_app.logger.debug(f"Handling event type: {event['type']}")
 
         # This is a Subscription Object https://stripe.com/docs/api/subscriptions/object
         subscriptionObject = event['data']['object']
@@ -70,27 +72,68 @@ class Stripe_API:
 
         # This is the Plan Object https://stripe.com/docs/api/plans/object
         planObject = self.get(f"v1/plans/{subPlanID}")
+        current_app.logger.debug(f"{planObject}")
 
         # This is the Product Object https://stripe.com/docs/api/products/object
         productObject = self.get(f"v1/products/{planObject['product']}")
 
         relaventPayload = {
             "Email": str(invoiceObject['customer_email'] or 'Error@NoEmailPresent.sad'),
-            "CID_Stripe": subscriptionObject['customer'],
+            "CustomerID": subscriptionObject['customer'],
             "PlanID": planObject['product'],
             "PlanName": productObject['name'],
             "Amount": subscriptionObject['plan']['amount'],
             "Reason": f"{invoiceObject['billing_reason']} {str(subscriptionObject['cancellation_details']['reason'] or '')}",
-            "Status": subscriptionObject['status']
-            
+            "Status": subscriptionObject['status']       
         }
         
 
-        print(relaventPayload)
+        current_app.logger.debug(relaventPayload)
         return relaventPayload
 
-        
-        # else:
-        #     print(f"Event Type: {event['type']}")
+    def handleSubscriptionEventDP(self, event: dict):   
+        current_app.logger.debug(f"Handling event type: {event['type']}")
+        # This is a Subscription Object https://stripe.com/docs/api/subscriptions/object
+        subscriptionObject = event['data']['object']
 
+        # DEBUG STATEMENT
+        #current_app.logger.debug(f'SUBSCRIPTION OBJECT: {subscriptionObject}')
+        # DEBUG STATEMENT
+
+        # This is the Invoice Object https://stripe.com/docs/api/invoices/object
+        invoiceObject = self.getInvoiceObject(subscriptionObject['latest_invoice'])
+        formattedInvoiceObject = json.dumps(invoiceObject, indent=4)
+        current_app.logger.debug(f'INVOICE OBJECT: {formattedInvoiceObject}')
+        subscriptionID = subscriptionObject['id']
+
+        # DEBUG STATEMENT
+        #current_app.logger.debug(f"PLAN OBJECT: {formattedPlanObject}")
+        # DEBUG STATEMENT
+        totalAmount = 0
+        for line in invoiceObject['lines']['data']:
+            totalAmount += line['quantity']
+            
+
+        print(f"Amount: {invoiceObject['total']}\nTotalAmount: {totalAmount}\nPreviousAmount: {invoiceObject['lines']['data'][0]['quantity']}")
+
+        paymentLog = PaymentLogs(
+            Email = str(invoiceObject['customer_email'] or 'Error@NoEmailPresent.sad'),
+            CustomerID = subscriptionObject['customer'],
+            UnitsPurchased = subscriptionObject['quantity'],
+            Reason = f"{invoiceObject['billing_reason']} {str(subscriptionObject['cancellation_details']['reason'] or '')}",
+            Status = subscriptionObject['status']
+        )
+
+        relaventPayload = {
+            "Email": str(invoiceObject['customer_email'] or 'Error@NoEmailPresent.sad'),
+            # "Amount": invoiceObject['total'],
+            "CustomerID": subscriptionObject['customer'],
+            "SubscriptionID": subscriptionObject['id'],
+            "UnitsPurchased": subscriptionObject['quantity'],
+            "Reason": f"{invoiceObject['billing_reason']} {str(subscriptionObject['cancellation_details']['reason'] or '')}",
+            "Status": subscriptionObject['status']       
+        }
+
+        current_app.logger.info(relaventPayload)
+        return relaventPayload
 
