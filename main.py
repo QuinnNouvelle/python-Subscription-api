@@ -146,7 +146,7 @@ def dispositionProSubscriptions():
         'customer.subscription.deleted'
         #'customer.subscription.updated'
     })
-    print(event['type'])
+    app.logger.info(event['type'])
     if event['type'] in event_types: 
         subscriptionObject = event['data']['object']
         invoiceObject = StripeAPI.getInvoiceObject(subscriptionObject['latest_invoice'])
