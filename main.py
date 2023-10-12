@@ -45,19 +45,19 @@ def mergeUser(data: dict, endpoint: str, caspioAPI: Caspio_API, stripeAPI: Strip
         if data['CustomerID'] == record['CustomerID']:
             response = caspioAPI.put(endpoint, data, f"PK_ID={record['PK_ID']}")
             if response.status_code == 201 or response.status_code == 200:
-                print(f'Successfully Updated user {record["Email"]} with Data: {data}')
+                app.logger.info(f'Successfully Updated user {record["Email"]} with Data: {data}')
             else: 
-                print(response.status_code)
-                print(f'ERROR: User {record["Email"]} with Data: {data} Is not updated in the database\nResponse: {response.text}')
+                app.logger.error(response.status_code)
+                app.logger.error(f'User {record["Email"]} with Data: {data} Is not updated in the database\nResponse: {response.text}')
             return response
         
     # If email does not exists on Caspio, post a new user.
     response = caspioAPI.post(endpoint, data)
     if response.status_code == 201:
         print(response.status_code)
-        print(f'Successfully Created A new User with Data: {data}')
+        app.logger.info(f'Successfully Created A new User with Data: {data}')
     else:
-        print(f"{response.status_code} {response.text}")
+        app.logger.info(f"{response.status_code} {response.text}")
     return response
 
 @app.route('/', methods=['GET'])
@@ -158,6 +158,7 @@ def dispositionProSubscriptions():
             "UnitsPurchased": subscriptionObject['quantity'],
             "Status": subscriptionObject['status']       
         }
+        app.logger.info(UserPayload)
         
         response = mergeUser(
             data=UserPayload, 
@@ -184,6 +185,7 @@ def dispositionProSubscriptions():
                 'UnitsPurchased': subscriptionObject['quantity'],
                 'Status': subscriptionObject['status']
             }
+            app.logger.info(UserPayload)
 
             response = mergeUser(
                 data=UserPayload,
@@ -191,8 +193,16 @@ def dispositionProSubscriptions():
                 caspioAPI=CaspioAPI,
                 stripeAPI=StripeAPI
             )
+
+            if response.status_code == 201 or response.status_code == 200:
+                app.logger.info("Event Successfully Triggered. Record Successfully Changed.")
+                return {'status': 'accepted', 'message': 'Event Successfully Triggered. Record Successfully Changed.'}, response.status_code
+            
+            else:
+                app.logger.error(f"Event Successfully Triggered. Record Failed To Created.\n{response.text}")
+                return {'status': 'denied', 'message': 'Event Successfully Triggered. Record Failed To Created.'}
         else:
-            print("Do Not Change Units No Charge")
+            app.logger.info("Do Not Change Units No Charge")
         
     return {'status': 'accepted', 'message': 'Webhook Accepted'}, 200
 
