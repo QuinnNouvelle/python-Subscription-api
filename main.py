@@ -17,8 +17,7 @@ gunicorn_logger = logging.getLogger('gunicorn.error')
 app.logger.handlers = gunicorn_logger.handlers
 app.logger.setLevel(gunicorn_logger.level)
 
-StripeAPI = Stripe_API(config)
-CaspioAPI = Caspio_API(config)
+
 
 # Replace 'your_secret_token' with your actual secret token
 secret_token = config['testSecretToken']
@@ -89,34 +88,36 @@ def webhook():
         return jsonify({'error': 'Internal Server Error'}), 500
 
 
-@app.route('/TitlePro/Subscriptions', methods=['POST'])
-def webhookSubscription():
-    event = None
-    payload = request.data
-    sig_header = request.headers['STRIPE_SIGNATURE']
+# @app.route('/TitlePro/Subscriptions', methods=['POST'])
+# def webhookSubscription():
+#     StripeAPI = Stripe_API(config)
+#     CaspioAPI = Caspio_API(config)
+#     event = None
+#     payload = request.data
+#     sig_header = request.headers['STRIPE_SIGNATURE']
 
-    try:
-        event = stripe.Webhook.construct_event(
-            payload, sig_header, endpoint_secret
-        )
-    except ValueError as e:
-        # Invalid payload
-        print(f"Invalid payload: {e}")
-        return jsonify({'status': 'error', 'message': 'Invalid payload'}), 400
-    except stripe.error.SignatureVerificationError as e:
-        # Invalid signature
-        print(f"Signature verification error: {e}")
-        return jsonify({'status': 'error', 'message': 'Invalid signature'}), 400
+#     try:
+#         event = stripe.Webhook.construct_event(
+#             payload, sig_header, endpoint_secret
+#         )
+#     except ValueError as e:
+#         # Invalid payload
+#         print(f"Invalid payload: {e}")
+#         return jsonify({'status': 'error', 'message': 'Invalid payload'}), 400
+#     except stripe.error.SignatureVerificationError as e:
+#         # Invalid signature
+#         print(f"Signature verification error: {e}")
+#         return jsonify({'status': 'error', 'message': 'Invalid signature'}), 400
 
-    event_types = set({'customer.subscription.created','customer.subscription.deleted','customer.subscription.updated'})
-    if event['type'] in event_types: 
-        UserSubscriptionPayload = StripeAPI.handleSubscriptionEvent(event)
-        response = CaspioAPI.mergeUser(UserSubscriptionPayload)
-        return jsonify({'status': 'accepted', 'message': 'Event Successfully Triggered.'}), response.status_code
+#     event_types = set({'customer.subscription.created','customer.subscription.deleted','customer.subscription.updated'})
+#     if event['type'] in event_types: 
+#         UserSubscriptionPayload = StripeAPI.handleSubscriptionEvent(event)
+#         response = CaspioAPI.mergeUser(UserSubscriptionPayload)
+#         return jsonify({'status': 'accepted', 'message': 'Event Successfully Triggered.'}), response.status_code
     
-    return jsonify({'status': 'accepted', 'message': 'Webhook Accepted'}), 200
+#     return jsonify({'status': 'accepted', 'message': 'Webhook Accepted'}), 200
 
-@app.route('test/dispositionPro/subscriptions', methods=['POST'])
+@app.route('/test/dispositionPro/subscriptions', methods=['POST'])
 def dispositionProSubscriptions():
     StripeAPI = Stripe_API(config=config, secretKey=config["stripeDispositionProSecretKeyDev"])
     CaspioAPI = Caspio_API(config=config)

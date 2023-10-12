@@ -2,7 +2,6 @@ import base64
 import json
 import requests
 from flask import current_app
-from .models.PaymentLogs import PaymentLogs
 
 class Caspio_API:
   
