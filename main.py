@@ -123,7 +123,7 @@ def dispositionProSubscriptions():
     CaspioAPI = Caspio_API(config=config)
     stripe.api_key = config["stripeDispositionProSecretKeyDev"]
     endpoint_secret = config["dispositionProStripeTestWebhookSigningSecret"]
-    caspioEndpoint = '/v2/tables/Python_DP_PaymentLogs/records'
+    caspioEndpoint = '/v2/tables/DP_Payment_Logs/records'
     event = None
     payload = request.data
     sig_header = request.headers['STRIPE_SIGNATURE']
