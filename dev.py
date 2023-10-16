@@ -5,6 +5,7 @@ import stripe
 import json
 from utils.Stripe_API import Stripe_API
 from utils.Caspio_API import Caspio_API
+import datetime
 
 app = Flask(__name__)
 config = dotenv_values('.env')
@@ -12,8 +13,8 @@ stripe.api_key = config["stripeSecretKey"]
 #endpoint_secret = config["signingSecret"]
 secret_token = config['testSecretToken']
 endpoint_secret = config['localSigningSecret']
+caspioEndpoint = '/v2/tables/Python_DP_PaymentLogs/records'
 
-## TODO Make find user based on StripeCustomerID
 def mergeUser(data: dict, endpoint: str, caspioAPI: Caspio_API, stripeAPI: Stripe_API) -> object:
     """Attempts to find user for the new data being submitted via email.
     If email is found the row is updated with information in the dict.
@@ -125,52 +126,85 @@ def dispositionProSubscriptions():
         #'customer.subscription.updated'
     })
     print(event['type'])
-    if event['type'] in event_types: 
-        subscriptionObject = event['data']['object']
-        invoiceObject = StripeAPI.getInvoiceObject(subscriptionObject['latest_invoice'])
-        
-        UserPayload = {
-            "Email": str(invoiceObject['customer_email'] or 'Error@NoEmailPresent.sad'),
-            # "Amount": invoiceObject['total'],
-            "CustomerID": subscriptionObject['customer'],
-            "UnitsPurchased": subscriptionObject['quantity'],
-            "Status": subscriptionObject['status']       
-        }
-        
-        response = mergeUser(
-            data=UserPayload, 
-            endpoint='/v2/tables/Python_DP_PaymentLogs/records', 
-            caspioAPI=CaspioAPI, 
-            stripeAPI=StripeAPI
-        )
-        
-        if response.status_code == 201 or response.status_code == 200:
-            app.logger.info("Event Successfully Triggered. Record Successfully Changed.")
-            return {'status': 'accepted', 'message': 'Event Successfully Triggered. Record Successfully Changed.'}, response.status_code
-        
-        else:
-            app.logger.error(f"Event Successfully Triggered. Record Failed To Created.\n{response.text}")
-            return {'status': 'denied', 'message': 'Event Successfully Triggered. Record Failed To Created.'}
-    elif event['type'] == 'invoice.paid':
-        invoiceObject = event['data']['object']
-        if invoiceObject['amount_due'] > 0:
-            subscriptionObject = StripeAPI.getSubscriptionObject(invoiceObject['subscription'])
-
+    match event['type']:
+        # Changes status 'active' to 'canceled'
+        case "customer.subscription.deleted":
+            subscriptionObject = event['data']['object']
+            invoiceObject = StripeAPI.getInvoiceObject(subscriptionObject['latest_invoice'])
             UserPayload = {
-                'Email': invoiceObject['customer_email'],
-                'CustomerID': invoiceObject['customer'],
-                'UnitsPurchased': subscriptionObject['quantity'],
-                'Status': subscriptionObject['status']
+                "Email": str(invoiceObject['customer_email'] or 'Error@NoEmailPresent.sad'),
+                # "Amount": invoiceObject['total'],
+                "CustomerID": subscriptionObject['customer'],
+                "UnitsPurchased": subscriptionObject['quantity'],
+                "Status": subscriptionObject['status']       
             }
-
             response = mergeUser(
-                data=UserPayload,
-                endpoint='/v2/tables/Python_DP_PaymentLogs/records',
-                caspioAPI=CaspioAPI,
+                data=UserPayload, 
+                endpoint=caspioEndpoint, 
+                caspioAPI=CaspioAPI, 
                 stripeAPI=StripeAPI
             )
-        else:
-            print("Do Not Change Units No Charge")
+            
+            if response.status_code == 201 or response.status_code == 200:
+                app.logger.info("Event Successfully Triggered. Record Successfully Changed.")
+                return {'status': 'accepted', 'message': 'Event Successfully Triggered. Record Successfully Changed.'}, response.status_code
+            
+            else:
+                app.logger.error(f"Event Successfully Triggered. Record Failed To Created.\n{response.text}")
+                return {'status': 'denied', 'message': 'Event Successfully Triggered. Record Failed To Created.'}
+        
+        # Updates the user object with the new QTY when an invoice has been paid and is over $0
+        case 'invoice.paid':
+            invoiceObject = event['data']['object']
+            if invoiceObject['amount_due'] > 0:
+                subscriptionObject = StripeAPI.getSubscriptionObject(invoiceObject['subscription'])
+                UserPayload = {
+                    'Email': invoiceObject['customer_email'],
+                    'CustomerID': invoiceObject['customer'],
+                    'UnitsPurchased': subscriptionObject['quantity'],
+                    'Status': subscriptionObject['status']
+                }
+                response = mergeUser(
+                    data=UserPayload,
+                    endpoint=caspioEndpoint,
+                    caspioAPI=CaspioAPI,
+                    stripeAPI=StripeAPI
+                )
+
+                if response.status_code == 201 or response.status_code == 200:
+                    app.logger.info("Event Successfully Triggered. Record Successfully Changed.")
+                    return {'status': 'accepted', 'message': 'Event Successfully Triggered. Record Successfully Changed.'}, response.status_code
+                else:
+                    app.logger.error(f"Event Successfully Triggered. Record Failed To Created.\n{response.text}")
+                    return {'status': 'denied', 'message': 'Event Successfully Triggered. Record Failed To Created.'}
+            else:
+                app.logger.info("Do Not Change Units No Charge")
+
+        # I am checking this webhook for 'cancellation_requested' within the 'customer.subscription.updated' trigger
+        case 'customer.subscription.updated':
+            subscriptionObject = event['data']['object']
+            #print(json.dumps(subscriptionObject, indent=4))
+            unixTime = subscriptionObject['cancel_at']
+            if subscriptionObject['cancel_at'] != None:
+                datetime_obj = datetime.datetime.utcfromtimestamp(unixTime)
+                formatted_date = datetime_obj.strftime('%m/%d/%Y')
+                UserPayload = {
+                    "CustomerID": subscriptionObject['customer'],
+                    "EndDate": formatted_date    
+                }
+                response = mergeUser(
+                    data=UserPayload,
+                    endpoint=caspioEndpoint,
+                    caspioAPI=CaspioAPI,
+                    stripeAPI=StripeAPI
+                )
+                if response.status_code == 201 or response.status_code == 200:
+                    app.logger.info("Event Successfully Triggered. Record Successfully Changed.")
+                    return {'status': 'accepted', 'message': 'Event Successfully Triggered. Record Successfully Changed.'}, response.status_code
+                else:
+                    app.logger.error(f"Event Successfully Triggered. Record Failed To Created.\n{response.text}")
+                    return {'status': 'denied', 'message': 'Event Successfully Triggered. Record Failed To Created.'}, 400
+
         
     return {'status': 'accepted', 'message': 'Webhook Accepted'}, 200
 

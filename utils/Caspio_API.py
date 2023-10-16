@@ -5,7 +5,7 @@ from flask import current_app
 
 class Caspio_API:
   
-    def __init__(self: object, config):
+    def __init__(self: object, config: dict):
         self._config = config
 
     @property

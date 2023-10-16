@@ -11,7 +11,7 @@ class Stripe_API:
     # This is your Stripe CLI webhook secret for testing your endpoint locally.
     endpoint_secret = 'whsec_d07e3db61c55e1b808a9330eafa081b8386d7958aa5e059260f5e34f50d41c65'
 
-    def __init__(self, config, secretKey):
+    def __init__(self, config: dict, secretKey: str):
         self.config = config
         self.headers = { "Authorization": f"Bearer {secretKey}"}
 
