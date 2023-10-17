@@ -206,6 +206,8 @@ def dispositionProSubscriptions():
             #print(json.dumps(subscriptionObject, indent=4))
             unixTime = subscriptionObject['cancel_at']
             if subscriptionObject['cancel_at'] != None:
+            
+
                 datetime_obj = datetime.datetime.utcfromtimestamp(unixTime)
                 formatted_date = datetime_obj.strftime('%m/%d/%Y')
                 UserPayload = {
@@ -224,8 +226,28 @@ def dispositionProSubscriptions():
                 else:
                     app.logger.error(f"Event Successfully Triggered. Record Failed To Created.\n{response.text}")
                     return {'status': 'denied', 'message': 'Event Successfully Triggered. Record Failed To Created.'}, 400
+            else: 
+                UserPayload = {
+                    "CustomerID": subscriptionObject['customer'],
+                    "EndDate": ""    
+                }
+                response = mergeUser(
+                    data=UserPayload,
+                    endpoint=caspioEndpoint,
+                    caspioAPI=CaspioAPI,
+                    stripeAPI=StripeAPI
+                )
+                if response.status_code == 201 or response.status_code == 200:
+                    app.logger.info("Event Successfully Triggered. Record Successfully Changed.")
+                    return {'status': 'accepted', 'message': 'Event Successfully Triggered. Record Successfully Changed.'}, response.status_code
+                else:
+                    app.logger.error(f"Event Successfully Triggered. Record Failed To Created.\n{response.text}")
+                    return {'status': 'denied', 'message': 'Event Successfully Triggered. Record Failed To Created.'}, 400
+
+
         
     return {'status': 'accepted', 'message': 'Webhook Accepted'}, 200
+
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5000, debug=True)
