@@ -250,7 +250,7 @@ def webhook():
 
 @app.route('/live/dispositionPro/subscriptions', methods=['POST'])
 def dispositionProSubscriptions():
-    StripeAPI = Stripe_API(config=config, secretKey=config["stripeDispositionProSecretKeyDev"])
+    StripeAPI = Stripe_API(config=config, secretKey=config["stripeDispositionProSecretKeyProd"])
     CaspioAPI = Caspio_API(config=config)
     stripe.api_key = config["stripeDispositionProSecretKeyProd"]
     endpoint_secret = config["stripeDispositionProSigningSecretProd"]

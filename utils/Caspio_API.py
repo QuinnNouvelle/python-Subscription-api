@@ -13,7 +13,7 @@ class Caspio_API:
         return self._config
 
     @config.setter
-    def config(self: object, config):
+    def config(self: object, config: dict):
         self._config = config
 
     def _updateTokens(self: object, tokens: dict):
