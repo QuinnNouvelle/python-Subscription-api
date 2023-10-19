@@ -61,6 +61,37 @@ def mergeUser(data: dict, endpoint: str, caspioAPI: Caspio_API, stripeAPI: Strip
         app.logger.info(f"{response.status_code} {response.text}")
     return response
 
+def updateUser(data: dict, endpoint: str, caspioAPI: Caspio_API, stripeAPI: Stripe_API):
+    """Attempts to find user for the new data being submitted via CustomerID.
+    If customerID is found the row is updated with information in the dict.
+    If no email exists in Caspio Table then create a new record in that table with data.
+
+    Args:
+        self (object): Caspio_API Instance.
+        data (dict): Key:Value information for user.
+        endpoint (str): endpoint url of the table you want to affect
+
+    Returns:
+        object: request response object.
+    """
+    # Get All Records From A Table 
+    #print(paymentLog)
+    response = caspioAPI.get(endpoint)
+    recordsDict = json.loads(response.text)
+
+    # Iterate Through Those Records and update data
+    for record in recordsDict['Result']:
+        if data['CustomerID'] == record['CustomerID']:
+            response = caspioAPI.put(endpoint, data, f"PK_ID={record['PK_ID']}")
+            if response.status_code == 201 or response.status_code == 200:
+                app.logger.info(f'Successfully Updated user {record["Email"]} with Data: {data}')
+            else: 
+                app.logger.error(response.status_code)
+                app.logger.error(f'User {record["Email"]} with Data: {data} Is not updated in the database\nResponse: {response.text}')
+            return response
+    app.logger.info(f"There are no records in caspio that exists with customerID: {data['CustomerID']}")
+    return 400
+
 @app.route('/', methods=['GET'])
 def homePage():
     return render_template('index.html')
@@ -314,6 +345,7 @@ def dispositionProSubscriptions():
                     'UnitsPurchased': subscriptionObject['quantity'],
                     'Status': subscriptionObject['status']
                 }
+                app.logger.info(UserPayload)
                 response = mergeUser(
                     data=UserPayload,
                     endpoint=caspioEndpoint,
@@ -357,22 +389,17 @@ def dispositionProSubscriptions():
                     app.logger.error(f"Event Successfully Triggered. Record Failed To Created.\n{response.text}")
                     return {'status': 'denied', 'message': 'Event Successfully Triggered. Record Failed To Created.'}, 400
             else: 
+
                 UserPayload = {
                     "CustomerID": subscriptionObject['customer'],
                     "EndDate": ""    
                 }
-                response = mergeUser(
+                updateUser(
                     data=UserPayload,
                     endpoint=caspioEndpoint,
                     caspioAPI=CaspioAPI,
                     stripeAPI=StripeAPI
                 )
-                if response.status_code == 201 or response.status_code == 200:
-                    app.logger.info("Event Successfully Triggered. Record Successfully Changed.")
-                    return {'status': 'accepted', 'message': 'Event Successfully Triggered. Record Successfully Changed.'}, response.status_code
-                else:
-                    app.logger.error(f"Event Successfully Triggered. Record Failed To Created.\n{response.text}")
-                    return {'status': 'denied', 'message': 'Event Successfully Triggered. Record Failed To Created.'}, 400
 
 
         
