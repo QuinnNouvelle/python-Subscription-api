@@ -9,7 +9,7 @@ import datetime
 import json
 
 app = Flask(__name__)
-config = dotenv_values('.env')
+config = dict(dotenv_values('.env'))
 stripe.api_key = config["stripeSecretKey"]
 endpoint_secret = config["signingSecret"]
 
@@ -405,6 +405,11 @@ def dispositionProSubscriptions():
         
     return {'status': 'accepted', 'message': 'Webhook Accepted'}, 200
 
+# app name 
+@app.errorhandler(404) 
+def not_found(e): 
+    app.logger.info(f"Nerd From {request.origin}. Got a 404")
+    return {"Message": "Stop"}, 404
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5000, debug=True)

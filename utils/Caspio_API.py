@@ -6,15 +6,7 @@ from flask import current_app
 class Caspio_API:
   
     def __init__(self: object, config: dict):
-        self._config = config
-
-    @property
-    def config(self: object):
-        return self._config
-
-    @config.setter
-    def config(self: object, config: dict):
-        self._config = config
+        self.config = config
 
     def _updateTokens(self: object, tokens: dict):
         """Private Function.  Used to update the .env file.  Only updates the key:value 
@@ -45,7 +37,7 @@ class Caspio_API:
         self.config = updated_lines
         print(f"Variables updated in .env")
 
-    def _getBearerAccessToken(self: object) -> object:
+    def _getBearerAccessToken(self) -> object:
         """Private Function. Requests BearerAccessToken from Caspio.
         Only Updates .env variables when response.status_code = 200.
         Args:

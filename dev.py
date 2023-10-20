@@ -8,7 +8,7 @@ from utils.Caspio_API import Caspio_API
 import datetime
 
 app = Flask(__name__)
-config = dotenv_values('.env')
+config = dict(dotenv_values('.env'))
 stripe.api_key = config["stripeSecretKey"]
 #endpoint_secret = config["signingSecret"]
 secret_token = config['testSecretToken']
@@ -159,7 +159,7 @@ def dispositionProSubscriptions():
             if invoiceObject['amount_due'] > 0:
                 subscriptionObject = StripeAPI.getSubscriptionObject(invoiceObject['subscription'])
                 UserPayload = {
-                    'Email': invoiceObject['customer_email'],
+                    'Email': invoiceObject['customer_email'] or "Email@email.com",
                     'CustomerID': invoiceObject['customer'],
                     'UnitsPurchased': subscriptionObject['quantity'],
                     'Status': subscriptionObject['status']
@@ -207,6 +207,12 @@ def dispositionProSubscriptions():
 
         
     return {'status': 'accepted', 'message': 'Webhook Accepted'}, 200
+
+# app name 
+@app.errorhandler(404) 
+def not_found(e): 
+    app.logger.info(f"Nerd From {request.origin}. ")
+    return {"Message": f"Stop"}, 404
 
 
 app.run(host="127.0.0.1", port=4242, debug=True)
