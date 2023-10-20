@@ -405,11 +405,18 @@ def dispositionProSubscriptions():
         
     return {'status': 'accepted', 'message': 'Webhook Accepted'}, 200
 
-# app name 
 @app.errorhandler(404) 
 def not_found(e): 
-    app.logger.info(f"Nerd From {request.headers}. Got a 404")
-    return {"Message": "Stop"}, 404
+    try:
+        UserMachine = request.headers["User-Agent"]
+    except:
+        UserMachine = ""
+    try:
+        requestIP = request.headers["X-Real-Ip"]
+    except:
+        requestIP = ""
+    app.logger.info(f"Nerd Using {UserMachine}. From IP: {requestIP}")
+    return {"Message": f"Stop"}, 404
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5000, debug=True)

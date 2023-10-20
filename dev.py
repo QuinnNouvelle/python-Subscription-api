@@ -211,7 +211,15 @@ def dispositionProSubscriptions():
 # app name 
 @app.errorhandler(404) 
 def not_found(e): 
-    app.logger.info(f"Nerd From {request.origin}. ")
+    try:
+        UserMachine = request.headers["User-Agent"]
+    except:
+        UserMachine = ""
+    try:
+        requestIP = request.headers["X-Real-Ip"]
+    except:
+        requestIP = ""
+    app.logger.info(f"Nerd Using {UserMachine}. From IP: {requestIP}")
     return {"Message": f"Stop"}, 404
 
 
