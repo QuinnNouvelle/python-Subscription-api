@@ -408,7 +408,7 @@ def dispositionProSubscriptions():
 # app name 
 @app.errorhandler(404) 
 def not_found(e): 
-    app.logger.info(f"Nerd From {request.headers.host}. Got a 404")
+    app.logger.info(f"Nerd From {request.headers}. Got a 404")
     return {"Message": "Stop"}, 404
 
 if __name__ == '__main__':
