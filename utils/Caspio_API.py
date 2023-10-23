@@ -6,7 +6,7 @@ from flask import current_app
 class Caspio_API:
   
     def __init__(self: object, config: dict):
-        self.config = config
+        self.config = dict(config)
 
     def _updateTokens(self: object, tokens: dict):
         """Private Function.  Used to update the .env file.  Only updates the key:value 

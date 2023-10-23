@@ -60,8 +60,8 @@ def homePage():
 
 @app.route('/webhook/subscriptions', methods=['POST'])
 def webhookSubscription():
-    StripeAPI = Stripe_API(config, config["stripeSecretKey"])
-    CaspioAPI = Caspio_API(config, config["stripeSecretKey"])
+    StripeAPI = Stripe_API(dict(config), config["stripeSecretKey"])
+    CaspioAPI = Caspio_API(dict(config), config["stripeSecretKey"])
     stripe.api_key = config["stripeSecretKey"]
     endpoint_secret = config['localSigningSecret']
     event = None
