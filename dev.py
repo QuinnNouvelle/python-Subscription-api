@@ -32,6 +32,7 @@ def mergeUser(data: dict, endpoint: str, caspioAPI: Caspio_API, stripeAPI: Strip
     #print(paymentLog)
     response = caspioAPI.get(endpoint)
     recordsDict = json.loads(response.text)
+    print(recordsDict)
 
     # Iterate Through Those Records and update data
     for record in recordsDict['Result']:
@@ -99,8 +100,14 @@ def webhookSubscription():
 
 @app.route('/dispositionPro/subscriptions', methods=['POST'])
 def dispositionProSubscriptions():
-    StripeAPI = Stripe_API(config=config, secretKey=config["stripeDispositionProSecretKeyDev"])
-    CaspioAPI = Caspio_API(config=config)
+    StripeAPI = Stripe_API(secretKey=config["stripeDispositionProSecretKeyDev"])
+    CaspioAPI = Caspio_API(envPath=config['envPath'],
+                           clientID=config['ClientID'],
+                           clientSecret=config['ClientSecret'],
+                           accessTokenURL=config['accessTokenURL'],
+                           refreshToken=config['refreshToken'],
+                           bearerAccessToken=config['bearerAccessToken'],
+                           apiURL=config['apiURL'])
     stripe.api_key = config["stripeDispositionProSecretKeyDev"]
     endpoint_secret = config["dispositionProEndpointSecret"]
     event = None
