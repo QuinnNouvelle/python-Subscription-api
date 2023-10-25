@@ -340,10 +340,10 @@ def dispositionProSubscriptions():
                 return {'status': 'denied', 'message': 'Event Successfully Triggered. Record Failed To Created.'}
         case 'invoice.paid':
             invoiceObject = event['data']['object']
-            app.logger.info(invoiceObject)
+            #app.logger.info(invoiceObject)
             if invoiceObject['amount_due'] > 0:
                 subscriptionObject = StripeAPI.getSubscriptionObject(invoiceObject['subscription'])
-                app.logger.info(json.dumps(subscriptionObject, indent=4))
+                #app.logger.info(json.dumps(subscriptionObject, indent=4))
                 UserPayload = {
                     'Email': invoiceObject['customer_email'],
                     'CustomerID': invoiceObject['customer'],
