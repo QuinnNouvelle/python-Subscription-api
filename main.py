@@ -342,6 +342,7 @@ def dispositionProSubscriptions():
             invoiceObject = event['data']['object']
             #app.logger.info(invoiceObject)
             if invoiceObject['amount_due'] > 0:
+                app.logger.info(f"Invoice ID: {invoiceObject['']}\nCustomer Email: {invoiceObject['customer_email']}\nAmount Due: {invoiceObject['amount_due']}\nAmount Paid: {invoiceObject['amount_paid']}")
                 subscriptionObject = StripeAPI.getSubscriptionObject(invoiceObject['subscription'])
                 #app.logger.info(json.dumps(subscriptionObject, indent=4))
                 UserPayload = {
