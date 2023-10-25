@@ -319,15 +319,12 @@ def dispositionProSubscriptions():
             invoiceObject = StripeAPI.getInvoiceObject(subscriptionObject['latest_invoice'])
             
             UserPayload = {
-                "Email": str(invoiceObject['customer_email'] or 'Error@NoEmailPresent.sad'),
-                # "Amount": invoiceObject['total'],
                 "CustomerID": subscriptionObject['customer'],
-                "UnitsPurchased": subscriptionObject['quantity'],
                 "Status": subscriptionObject['status']       
             }
             app.logger.info(UserPayload)
             
-            response = mergeUser(
+            response = updateUser(
                 data=UserPayload, 
                 endpoint=caspioEndpoint, 
                 caspioAPI=CaspioAPI, 
@@ -346,12 +343,14 @@ def dispositionProSubscriptions():
             app.logger.info(invoiceObject)
             if invoiceObject['amount_due'] > 0:
                 subscriptionObject = StripeAPI.getSubscriptionObject(invoiceObject['subscription'])
+                app.logger.info(subscriptionObject)
                 UserPayload = {
                     'Email': invoiceObject['customer_email'],
                     'CustomerID': invoiceObject['customer'],
-                    'UnitsPurchased': subscriptionObject['quantity'],
+                    'UnitsPurchased': invoiceObject['quantity'],
                     'Status': subscriptionObject['status']
                 }
+                
                 app.logger.info(UserPayload)
                 response = mergeUser(
                     data=UserPayload,
