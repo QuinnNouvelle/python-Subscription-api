@@ -29,10 +29,11 @@ def mergeUser(data: dict, endpoint: str, caspioAPI: Caspio_API, stripeAPI: Strip
     # Get All Records From A Table 
     #print(paymentLog)
     response = caspioAPI.get(endpoint)
-    recordsDict = json.loads(response.text)
+    
 
     # Check that I got the response correctly
     if response.status_code == 201 or response.status_code == 200:
+        recordsDict = json.loads(response.text)
         for record in recordsDict['Result']:
             if data['CustomerID'] == record['CustomerID']:
                 response = caspioAPI.put(endpoint, data, f"PK_ID={record['PK_ID']}")
@@ -69,9 +70,10 @@ def updateUser(data: dict, endpoint: str, caspioAPI: Caspio_API, stripeAPI: Stri
         object: request response object.
     """
     response = caspioAPI.get(endpoint)
-    recordsDict = json.loads(response.text)
+    
 
     if response.status_code == 201 or response.status_code == 200:
+        recordsDict = json.loads(response.text)
         for record in recordsDict['Result']:
             if data['CustomerID'] == record['CustomerID']:
                 response = caspioAPI.put(endpoint, data, f"PK_ID={record['PK_ID']}")

@@ -24,44 +24,45 @@ app.logger.setLevel(gunicorn_logger.level)
 # Replace 'your_secret_token' with your actual secret token
 secret_token = config['testSecretToken']
 
-def mergeUser(data: dict, endpoint: str, caspioAPI: Caspio_API, stripeAPI: Stripe_API) -> object:
+def mergeUser(data: dict, endpoint: str, caspioAPI: Caspio_API, stripeAPI: Stripe_API):
     """Attempts to find user for the new data being submitted via CustomerID.
-    If customerID is found the row is updated with information in the dict.
-    If no email exists in Caspio Table then create a new record in that table with data.
+    If CustomerID is found the row is updated with information in the dict.
+    If no CustomerID exists in Caspio Table then create a new record in that table with data.
 
     Args:
-        self (object): Caspio_API Instance.
         data (dict): Key:Value information for user.
         endpoint (str): endpoint url of the table you want to affect
 
-    Returns:
-        object: request response object.
     """
     # Get All Records From A Table 
     #print(paymentLog)
     response = caspioAPI.get(endpoint)
-    recordsDict = json.loads(response.text)
-
-    # Iterate Through Those Records and update data
-    for record in recordsDict['Result']:
-        if data['CustomerID'] == record['CustomerID']:
-            response = caspioAPI.put(endpoint, data, f"PK_ID={record['PK_ID']}")
-            if response.status_code == 201 or response.status_code == 200:
-                app.logger.info(f'Successfully Updated user {record["Email"]} with Data: {data}')
-            else: 
-                app.logger.error(response.status_code)
-                app.logger.error(f'User {record["Email"]} with Data: {data} Is not updated in the database\nResponse: {response.text}')
-            return response
     
-        
-    # If email does not exists on Caspio, post a new user.
-    response = caspioAPI.post(endpoint, data)
-    if response.status_code == 201:
-        print(response.status_code)
-        app.logger.info(f'Successfully Created A new User with Data: {data}')
+
+    # Check that I got the response correctly
+    if response.status_code == 201 or response.status_code == 200:
+        recordsDict = json.loads(response.text)
+        for record in recordsDict['Result']:
+            if data['CustomerID'] == record['CustomerID']:
+                response = caspioAPI.put(endpoint, data, f"PK_ID={record['PK_ID']}")
+                if response.status_code == 201 or response.status_code == 200:
+                    app.logger.info(f'-> mergeUser(): -> Successfully Updated user {record["Email"]} with Data: {data}')
+                    return
+                else: 
+                    app.logger.error(f"-> mergeUser(): -> {response.status_code} {response.text}")
+                    return  
+            
+        # If email does not exists on Caspio, post a new user.
+        response = caspioAPI.post(endpoint, data)
+        if response.status_code == 201:
+            app.logger.info(f"-> mergeUser(): -> Successfully Created A new User with Data {data}")
+            return
+        else:
+            app.logger.error(f"-> mergeUser(): -> {response.status_code} {response.text}")
+            return  
     else:
-        app.logger.info(f"{response.status_code} {response.text}")
-    return response
+        app.logger.error(f"-> mergeUser(): -> {response.status_code} {response.text}")
+        return       
 
 def updateUser(data: dict, endpoint: str, caspioAPI: Caspio_API, stripeAPI: Stripe_API):
     """Attempts to find user for the new data being submitted via CustomerID.
@@ -76,23 +77,24 @@ def updateUser(data: dict, endpoint: str, caspioAPI: Caspio_API, stripeAPI: Stri
     Returns:
         object: request response object.
     """
-    # Get All Records From A Table 
-    #print(paymentLog)
     response = caspioAPI.get(endpoint)
-    recordsDict = json.loads(response.text)
+    
 
-    # Iterate Through Those Records and update data
-    for record in recordsDict['Result']:
-        if data['CustomerID'] == record['CustomerID']:
-            response = caspioAPI.put(endpoint, data, f"PK_ID={record['PK_ID']}")
-            if response.status_code == 201 or response.status_code == 200:
-                app.logger.info(f'Successfully Updated user {record["Email"]} with Data: {data}')
-            else: 
-                app.logger.error(response.status_code)
-                app.logger.error(f'User {record["Email"]} with Data: {data} Is not updated in the database\nResponse: {response.text}')
-            return response
-    app.logger.info(f"There are no records in caspio that exists with customerID: {data['CustomerID']}")
-    return 400
+    if response.status_code == 201 or response.status_code == 200:
+        recordsDict = json.loads(response.text)
+        for record in recordsDict['Result']:
+            if data['CustomerID'] == record['CustomerID']:
+                response = caspioAPI.put(endpoint, data, f"PK_ID={record['PK_ID']}")
+                if response.status_code == 201 or response.status_code == 200:
+                    app.logger.info(f'-> updateUser(): -> Successfully Updated user {record["Email"]} with Data: {data}')
+                    return
+                else: 
+                    app.logger.error(f"-> updateUser(): -> {response.status_code} {response.text}")
+                    return 
+        app.logger.info(f"-> updateUser(): ->There are no records in caspio that exists with customerID: {data['CustomerID']}")
+    else:
+        app.logger.error(f"-> updateUser(): -> {response.status_code} {response.text}")      
+    return
 
 @app.route('/', methods=['GET'])
 def homePage():
