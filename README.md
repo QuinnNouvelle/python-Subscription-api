@@ -5,6 +5,18 @@
 This is a Flask webserver that is used to accept and process webhooks from Stripe.  The domain of this server is https://nouvelletechdemo.com/
 
 
+## Set Up
+
+Create a python venv and install requirements.txt
+Make sure you have your .env
+
+```
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt 
+```
+
+
 ## Server Configuration
 
 ### NGINX
