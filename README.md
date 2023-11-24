@@ -43,3 +43,14 @@ This is triggered on startup on the server with the service 'main.service'
 Running this main.service is what enables the flask application to be available from the domain.
 
 ### Flask
+
+Flask is a micro web framework written in Python.  Allows for lightweight simple web applications, great for handleing a webhook and sending an API request to a database.
+
+
+## Overview
+
+I am handling 3 triggers from stripe in this flask Application.  
+
+customer.subscription.updated, customer.subscription.deleted, invoice.paid
+
+
