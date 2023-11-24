@@ -1,246 +1,275 @@
-from flask import Flask, render_template, request, jsonify
-from werkzeug.middleware.proxy_fix import ProxyFix
+import datetime
+from flask import Flask, render_template, request
 from dotenv import dotenv_values
 import stripe
 import json
 from utils.Stripe_API import Stripe_API
-from utils.Caspio_API import Caspio_API
-import datetime
+from utils.Caspio_API import Caspio_API, NoUsersToUpdate
+
 
 app = Flask(__name__)
 config = dict(dotenv_values('.env'))
-stripe.api_key = config["stripeSecretKey"]
-#endpoint_secret = config["signingSecret"]
-environment = "Dev"
+ENVIRONMENT = "Dev"
 secret_token = config['testSecretToken']
-endpoint_secret = config['localSigningSecret']
-caspioEndpoint = '/v2/tables/Python_DP_PaymentLogs/records'
+dispositionProEndpoint = '/v2/tables/Python_DP_PaymentLogs/records'
+titleProEndpoint = '/v2/tables/TitlePro_PaymentLogs/records'
 
-def mergeUser(data: dict, endpoint: str, caspioAPI: Caspio_API, stripeAPI: Stripe_API):
-    """Attempts to find user for the new data being submitted via CustomerID.
-    If CustomerID is found the row is updated with information in the dict.
-    If no CustomerID exists in Caspio Table then create a new record in that table with data.
+def DP_invoice_paid(invoiceObject: dict, stripeAPI: Stripe_API, caspioAPI: Caspio_API):
+    """The Main logic for the invoice.paid trigger coming from Stripe.
 
     Args:
-        data (dict): Key:Value information for user.
-        endpoint (str): endpoint url of the table you want to affect
-
+        invoiceObject (dict): https://stripe.com/docs/api/invoices/object
+        stripeAPI (Stripe_API): Instance of Stripe_API class
+        caspioAPI (Caspio_API): Instance of Caspio_API class
     """
-    # Get All Records From A Table 
-    #print(paymentLog)
-    response = caspioAPI.get(endpoint)
-    
+    if invoiceObject['amount_due'] > 0:
+        subscriptionObject = stripeAPI.getSubscriptionObject(invoiceObject['subscription'])
+        UserPayload = {
+            'Email': invoiceObject['customer_email'],
+            'CustomerID': invoiceObject['customer'],
+            'UnitsPurchased': subscriptionObject['quantity'],
+            'Status': subscriptionObject['status']
+        }
+        app.logger.info(f"Invoice ID: {invoiceObject['id']} | Amount Due: {invoiceObject['amount_due']} | Amount Paid: {invoiceObject['amount_paid']} | Payload: {UserPayload}")
+        try:
+            response = caspioAPI.mergeUser(data=UserPayload, endpoint=dispositionProEndpoint)
 
-    # Check that I got the response correctly
-    if response.status_code == 201 or response.status_code == 200:
-        recordsDict = json.loads(response.text)
-        for record in recordsDict['Result']:
-            if data['CustomerID'] == record['CustomerID']:
-                response = caspioAPI.put(endpoint, data, f"PK_ID={record['PK_ID']}")
-                if response.status_code == 201 or response.status_code == 200:
-                    app.logger.info(f'-> mergeUser(): -> Successfully Updated user {record["Email"]} with Data: {data}')
-                    return
-                else: 
-                    app.logger.error(f"-> mergeUser(): -> {response.status_code} {response.text}")
-                    return  
-            
-        # If email does not exists on Caspio, post a new user.
-        response = caspioAPI.post(endpoint, data)
-        if response.status_code == 201:
-            app.logger.info(f"-> mergeUser(): -> Successfully Created A new User with Data {data}")
-            return
+            if response.status_code in {200, 201}:
+                app.logger.info("MERGE SUCCESS")
+            else:
+                app.logger.error("MERGE FAILED")
+                app.logger.error(f"{response.status_code} {response.text}")
+                app.logger.error(f"Make sure that {UserPayload} is added to Caspio")
+        except Exception as e:
+            app.logger.error(f"MERGE FAILED: {e}")
+            app.logger.error(f"Make sure that {UserPayload} is added to Caspio")
+    else:
+        app.logger.info("Do Not Change Units No Charge")
+
+def DP_customer_subscription_deleted(subscriptionObject: dict, caspioAPI: Caspio_API):
+    """The Main logic for the customer.subscription.deleted trigger coming from Stripe.
+
+    Args:
+        subscriptionObject (dict): https://stripe.com/docs/api/subscriptions/object
+        caspioAPI (Caspio_API): Instance of Caspio_API Class
+    """
+    UserPayload = {"Status": subscriptionObject['status']}
+    app.logger.info(f"CustomerID: {subscriptionObject['customer']} | Payload: {UserPayload}")
+    try:
+        response = caspioAPI.updateUser(data=UserPayload, endpoint=dispositionProEndpoint, customerID=subscriptionObject['customer'])
+        if response.status_code == 200:
+            app.logger.info("UPDATE SUCCESS")
         else:
-            app.logger.error(f"-> mergeUser(): -> {response.status_code} {response.text}")
-            return  
-    else:
-        app.logger.error(f"-> mergeUser(): -> {response.status_code} {response.text}")
-        return       
+            app.logger.error("UPDATE FAILED")
+            app.logger.error(response.status_code, response.text)
+            app.logger.error(f"Make sure CustomerID: {subscriptionObject['customer']} | Gets Payload: {UserPayload}")
+    except NoUsersToUpdate:
+        app.logger.error("Event: Customer cancellation requested period has ended, the subscription should be canceled but for some reason no users were found in caspio")
+    except Exception as e:
+        app.logger.error(e)
 
-def updateUser(data: dict, endpoint: str, caspioAPI: Caspio_API, stripeAPI: Stripe_API):
-    """Attempts to find user for the new data being submitted via CustomerID.
-    If customerID is found the row is updated with information in the dict.
-    If no email exists in Caspio Table then create a new record in that table with data.
+def DP_customer_subscription_updated(subscriptionObject: dict, caspioAPI: Caspio_API):
+    """The Main logic for the DispositionPro customer.subscription.updated trigger coming from Stripe.
 
     Args:
-        self (object): Caspio_API Instance.
-        data (dict): Key:Value information for user.
-        endpoint (str): endpoint url of the table you want to affect
-
-    Returns:
-        object: request response object.
+        subscriptionObject (dict): https://stripe.com/docs/api/subscriptions/object
+        caspioAPI (Caspio_API): Instance of Caspio_API Class
     """
-    response = caspioAPI.get(endpoint)
-    
-
-    if response.status_code == 201 or response.status_code == 200:
-        recordsDict = json.loads(response.text)
-        for record in recordsDict['Result']:
-            if data['CustomerID'] == record['CustomerID']:
-                response = caspioAPI.put(endpoint, data, f"PK_ID={record['PK_ID']}")
-                if response.status_code == 201 or response.status_code == 200:
-                    app.logger.info(f'-> updateUser(): -> Successfully Updated user {record["Email"]} with Data: {data}')
-                    return
-                else: 
-                    app.logger.error(f"-> updateUser(): -> {response.status_code} {response.text}")
-                    return 
-        app.logger.info(f"-> updateUser(): ->There are no records in caspio that exists with customerID: {data['CustomerID']}")
+    unixTime = subscriptionObject['cancel_at']
+    UserPayload = {}
+    if subscriptionObject['cancel_at'] is not None:
+        datetime_obj = datetime.datetime.utcfromtimestamp(unixTime)
+        formatted_date = datetime_obj.strftime('%m/%d/%Y')
+        UserPayload = {"EndDate": formatted_date}      
     else:
-        app.logger.error(f"-> updateUser(): -> {response.status_code} {response.text}")      
-    return
+        UserPayload = {"EndDate": ""}
+    app.logger.info(f"CustomerID: {subscriptionObject['customer']} | Payload: {UserPayload}")
+    try:
+        response = caspioAPI.updateUser(customerID=subscriptionObject['customer'], data=UserPayload, endpoint=dispositionProEndpoint)
+        if response.status_code == 200:
+            app.logger.info("UPDATE SUCCESS")
+        else:
+            app.logger.error(f"UPDATE FAILED | !! Make Sure CustomerID: {subscriptionObject['customer']} | Is updated with Payload: {UserPayload} in Caspio !!")
+    except NoUsersToUpdate:
+        app.logger.warning(f"No user exists with customerID {subscriptionObject['customer']}")
+    except Exception as e:
+        app.logger.error(e)
+
+def TP_customer_subscription_updated(subscriptionObject: dict, caspioAPI: Caspio_API):
+    """The Main logic for the TitlePro customer.subscription.updated trigger coming from Stripe.
+    Args:
+        subscriptionObject (dict): https://stripe.com/docs/api/subscriptions/object
+        caspioAPI (Caspio_API): Instance of Caspio_API Class
+    """
+    unixTime = subscriptionObject['cancel_at']
+    UserPayload = {}
+    if subscriptionObject['cancel_at'] is not None:
+        datetime_obj = datetime.datetime.utcfromtimestamp(unixTime)
+        formatted_date = datetime_obj.strftime('%m/%d/%Y')
+        UserPayload = {"EndDate": formatted_date}      
+    else:
+        UserPayload = {"EndDate": ""}
+    app.logger.info(f"CustomerID: {subscriptionObject['customer']} | Payload: {UserPayload}")
+    try:
+        response = caspioAPI.updateUser(customerID=subscriptionObject['customer'], data=UserPayload, endpoint=titleProEndpoint)
+        if response.status_code == 200:
+            app.logger.info("UPDATE SUCCESS")
+        else:
+            app.logger.error(f"UPDATE FAILED | !! Make Sure CustomerID: {subscriptionObject['customer']} | Is updated with Payload: {UserPayload} in Caspio !!")
+            app.logger.error(f"{response.status_code} {response.text}")
+    except NoUsersToUpdate:
+        app.logger.warning(f"No user exists with customerID {subscriptionObject['customer']}")
+    except Exception as e:
+        app.logger.error(e)
+
+def TP_customer_subscription_deleted(subscriptionObject: dict, caspioAPI: Caspio_API):
+    """The Main logic for the TitlePro customer.subscription.deleted trigger coming from Stripe.
+
+    Args:
+        subscriptionObject (dict): https://stripe.com/docs/api/subscriptions/object
+        caspioAPI (Caspio_API): Instance of Caspio_API Class
+    """
+    UserPayload = {"Status": subscriptionObject['status']}
+    app.logger.info(f"CustomerID: {subscriptionObject['customer']} | Payload: {UserPayload}")
+    try:
+        response = caspioAPI.updateUser(data=UserPayload, endpoint=titleProEndpoint, customerID=subscriptionObject['customer'])
+        if response.status_code == 200:
+            app.logger.info("UPDATE SUCCESS")
+        else:
+            app.logger.error("UPDATE FAILED")
+            app.logger.error(response.status_code, response.text)
+            app.logger.error(f"Make sure CustomerID: {subscriptionObject['customer']} | Gets Payload: {UserPayload}")
+    except NoUsersToUpdate:
+        app.logger.error("Event: Customer cancellation requested period has ended, the subscription should be canceled but for some reason no users were found in caspio")
+    except Exception as e:
+        app.logger.error(e)
+
+def TP_invoice_paid(invoiceObject: dict, stripeAPI: Stripe_API, caspioAPI: Caspio_API):
+    """The Main logic for the TitlePro invoice.paid trigger coming from Stripe.
+
+    Args:
+        invoiceObject (dict): https://stripe.com/docs/api/invoices/object
+        stripeAPI (Stripe_API): Instance of Stripe_API class
+        caspioAPI (Caspio_API): Instance of Caspio_API class
+    """
+    if invoiceObject['amount_due'] > 0:
+        subscriptionObject = stripeAPI.getSubscriptionObject(invoiceObject['subscription'])
+        UserPayload = {
+            'Email': invoiceObject['customer_email'],
+            'CustomerID': invoiceObject['customer'],
+            'Purchased_Seats': subscriptionObject['quantity'],
+            'Status': subscriptionObject['status']
+        }
+        app.logger.info(f"Invoice ID: {invoiceObject['id']} | Amount Due: {invoiceObject['amount_due']} | Amount Paid: {invoiceObject['amount_paid']} | Payload: {UserPayload}")
+        try:
+            response = caspioAPI.mergeUser(data=UserPayload, endpoint=titleProEndpoint)
+
+            if response.status_code in {200, 201}:
+                app.logger.info("MERGE SUCCESS")
+            else:
+                app.logger.error("MERGE FAILED")
+                app.logger.error(f"{response.status_code} {response.text}")
+                app.logger.error(f"Make sure that {UserPayload} is added to Caspio")
+        except Exception as e:
+            app.logger.error(f"MERGE FAILED: {e}")
+            app.logger.error(f"Make sure that {UserPayload} is added to Caspio")
+    else:
+        app.logger.info("Do Not Change Seats No Charge")
 
 
 @app.route('/', methods=['GET'])
 def homePage():
-    return render_template(f'index{environment}.html')
-
-# @app.route('/webhook/subscriptions', methods=['POST'])
-# def webhookSubscription():
-#     StripeAPI = Stripe_API(dict(config), config["stripeSecretKey"])
-#     CaspioAPI = Caspio_API(dict(config), config["stripeSecretKey"])
-#     stripe.api_key = config["stripeSecretKey"]
-#     endpoint_secret = config['localSigningSecret']
-#     event = None
-#     payload = request.data
-#     sig_header = request.headers['STRIPE_SIGNATURE']
-
-#     try:
-#         event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
-
-#     except ValueError as e:
-#         # Invalid payload
-#         app.logger.warning(f'Invalid Payload From: {request.remote_addr}')
-#         return {'status': 'error', 'message': 'Invalid payload'}, 400
-
-#     except stripe.error.SignatureVerificationError as e:
-#         # Invalid signature
-#         app.logger.warning(f'Invalid Stripe Signature from: {request.remote_addr}')
-#         return {'status': 'error', 'message': 'Invalid signature'}, 400
-
-#     event_types = set({'customer.subscription.created','customer.subscription.deleted','customer.subscription.updated'})
-
-#     if event['type'] in event_types: 
-#         UserSubscriptionPayload = StripeAPI.handleSubscriptionEvent(event)
-#         response = CaspioAPI.mergeUser(UserSubscriptionPayload)
-
-#         if response.status_code == 200:
-#             app.logger.info(f'Event Successfully Triggered, Record Successfully Created.')
-#             return {'status': 'accepted', 'message': 'Event Successfully Triggered, Record Successfully Created.'}, response.status_code
-        
-#         else:
-#             app.logger.error(f'Event Successfully Triggered, Record Failed To Create.')
-#             return {'status': 'denied', 'message': 'Event Successfully Triggered, Record Failed To Create.'}, 400
-    
-#     return {'status': 'accepted', 'message': 'Webhook Accepted'}, 200
+    return render_template(f'index{ENVIRONMENT}.html')
 
 @app.route('/dispositionPro/subscriptions', methods=['POST'])
 def dispositionProSubscriptions():
-    StripeAPI = Stripe_API(secretKey=config[f"stripeDispositionProSecretKey{environment}"])
-    CaspioAPI = Caspio_API(envPath=config['envPath'],
-                           clientID=config['ClientID'],
-                           clientSecret=config['ClientSecret'],
-                           accessTokenURL=config['accessTokenURL'],
-                           refreshToken=config['refreshToken'],
-                           bearerAccessToken=config['bearerAccessToken'],
-                           apiURL=config['apiURL'])
-    stripe.api_key = config[f"stripeDispositionProSecretKey{environment}"]
-    endpoint_secret = config[f"stripeDispositionProSigningSecret{environment}"]
+    """Main listening endpoint for STRIPE Disposition Pro DEV webhook."""
+ 
+    stripeAPI = Stripe_API(secretKey=config[f"stripeDispositionProSecretKey{ENVIRONMENT}"])
+    caspioAPI = Caspio_API()
+    stripe.api_key = config[f"stripeDispositionProSecretKey{ENVIRONMENT}"]
+    endpoint_secret = config[f"stripeDispositionProSigningSecret{ENVIRONMENT}"]
     event = None
     payload = request.data
     sig_header = request.headers['STRIPE_SIGNATURE']
-
     try:
         event = stripe.Webhook.construct_event(
             payload, sig_header, endpoint_secret
         )
     except ValueError as e:
         # Invalid payload
+        app.logger.warning(e)
         app.logger.warning(f'Invalid Payload From: {request.remote_addr}')
         return {'status': 'error', 'message': 'Invalid payload'}, 400
 
     except stripe.error.SignatureVerificationError as e:
         # Invalid signature
+        app.logger.warning(e)
         app.logger.warning(f'Invalid Stripe Signature from: {request.remote_addr}')
         return {'status': 'error', 'message': 'Invalid signature'}, 400
 
 
-    app.logger.info(event['type'])
+    
     match event['type']:
         case 'customer.subscription.deleted':
-            subscriptionObject = event['data']['object']
-            invoiceObject = StripeAPI.getInvoiceObject(subscriptionObject['latest_invoice'])
-            UserPayload = {
-                "CustomerID": subscriptionObject['customer'],
-                "Status": subscriptionObject['status']       
-            }
-            app.logger.info(UserPayload)
-            updateUser(
-                data=UserPayload, 
-                endpoint=caspioEndpoint, 
-                caspioAPI=CaspioAPI, 
-                stripeAPI=StripeAPI
-            )
+            DP_customer_subscription_deleted(subscriptionObject=event['data']['object'], caspioAPI=caspioAPI)
         case 'invoice.paid':
-            invoiceObject = event['data']['object']
-            if invoiceObject['amount_due'] > 0:
-                app.logger.info(f"Invoice ID: {invoiceObject['id']} | Customer Email: {invoiceObject['customer_email']} | Amount Due: {invoiceObject['amount_due']} | Amount Paid: {invoiceObject['amount_paid']}")
-                subscriptionObject = StripeAPI.getSubscriptionObject(invoiceObject['subscription'])
-                UserPayload = {
-                    'Email': invoiceObject['customer_email'],
-                    'CustomerID': invoiceObject['customer'],
-                    'UnitsPurchased': subscriptionObject['quantity'],
-                    'Status': subscriptionObject['status']
-                }
-                mergeUser(
-                    data=UserPayload,
-                    endpoint=caspioEndpoint,
-                    caspioAPI=CaspioAPI,
-                    stripeAPI=StripeAPI
-                )
-            else:
-                app.logger.info("Do Not Change Units No Charge")
+            DP_invoice_paid(invoiceObject=event['data']['object'], caspioAPI=caspioAPI, stripeAPI=stripeAPI)
         case 'customer.subscription.updated':
-            subscriptionObject = event['data']['object']
-            #print(json.dumps(subscriptionObject, indent=4))
-            unixTime = subscriptionObject['cancel_at']
-            if subscriptionObject['cancel_at'] != None:
-                datetime_obj = datetime.datetime.utcfromtimestamp(unixTime)
-                formatted_date = datetime_obj.strftime('%m/%d/%Y')
-                UserPayload = {
-                    "CustomerID": subscriptionObject['customer'],
-                    "EndDate": formatted_date    
-                }
-                updateUser(
-                    data=UserPayload,
-                    endpoint=caspioEndpoint,
-                    caspioAPI=CaspioAPI,
-                    stripeAPI=StripeAPI
-                )
-            else: 
-                UserPayload = {
-                    "CustomerID": subscriptionObject['customer'],
-                    "EndDate": ""    
-                }
-                updateUser(
-                    data=UserPayload,
-                    endpoint=caspioEndpoint,
-                    caspioAPI=CaspioAPI,
-                    stripeAPI=StripeAPI
-                )
+            DP_customer_subscription_updated(subscriptionObject=event['data']['object'], caspioAPI=caspioAPI)
+
     return {'status': 'accepted', 'message': 'Webhook Accepted'}, 200
 
-# app name 
-@app.errorhandler(404) 
-def not_found(e): 
+@app.route('/titlePro/subscriptions', methods=['POST'])
+def titleProSubscriptions():
+    stripeAPI = Stripe_API(secretKey=config[f"stripeTitleProSecretKey{ENVIRONMENT}"])
+    stripe.api_key = config[f"stripeDispositionProSecretKey{ENVIRONMENT}"]
+    caspioAPI = Caspio_API()
+    endpoint_secret = config[f"stripeTitleProSigningSecret{ENVIRONMENT}"]
+    event = None
+    payload = request.data
+    sig_header = request.headers['STRIPE_SIGNATURE']
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, endpoint_secret
+        )
+    except ValueError as e:
+        # Invalid payload
+        app.logger.warning(e)
+        app.logger.warning(f'Invalid Payload From: {request.remote_addr}')
+        return {'status': 'error', 'message': 'Invalid payload'}, 400
+
+    except stripe.error.SignatureVerificationError as e:
+        # Invalid signature
+        app.logger.warning(e)
+        app.logger.warning(f'Invalid Stripe Signature from: {request.remote_addr}')
+        return {'status': 'error', 'message': 'Invalid signature'}, 400
+
+    match event['type']:
+        case 'customer.subscription.deleted':
+            TP_customer_subscription_deleted(subscriptionObject=event['data']['object'], caspioAPI=caspioAPI)
+        case 'invoice.paid':
+            TP_invoice_paid(invoiceObject=event['data']['object'], caspioAPI=caspioAPI, stripeAPI=stripeAPI)
+        case 'customer.subscription.updated':
+            TP_customer_subscription_updated(subscriptionObject=event['data']['object'], caspioAPI=caspioAPI)
+
+    return {'status': 'accepted', 'message': 'Webhook Accepted'}, 200
+
+
+    
+
+@app.errorhandler(404)
+def not_found():
     try:
         UserMachine = request.headers["User-Agent"]
-    except:
+    except Exception:
         UserMachine = ""
     try:
         requestIP = request.headers["X-Real-Ip"]
-    except:
+    except Exception:
         requestIP = ""
-    app.logger.info(f"Nerd Using {UserMachine}. From IP: {requestIP}")
-    return {"Message": f"Stop"}, 404
+    app.logger.info(f"404: {UserMachine}. From IP: {requestIP}")
+    return {"Message": "Stop"}, 404
 
 
 app.run(host="127.0.0.1", port=4242, debug=True)

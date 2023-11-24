@@ -5,6 +5,18 @@
 This is a Flask webserver that is used to accept and process webhooks from Stripe.  The domain of this server is https://nouvelletechdemo.com/
 
 
+## Set Up
+
+Create a python venv and install requirements.txt
+Make sure you have your .env
+
+```
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt 
+```
+
+
 ## Server Configuration
 
 ### NGINX
@@ -31,3 +43,14 @@ This is triggered on startup on the server with the service 'main.service'
 Running this main.service is what enables the flask application to be available from the domain.
 
 ### Flask
+
+Flask is a micro web framework written in Python.  Allows for lightweight simple web applications, great for handleing a webhook and sending an API request to a database.
+
+
+## Overview
+
+I am handling 3 triggers from stripe in this flask Application.  
+
+customer.subscription.updated, customer.subscription.deleted, invoice.paid
+
+
