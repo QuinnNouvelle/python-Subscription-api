@@ -10,14 +10,12 @@ from utils.Caspio_API import Caspio_API, NoUsersToUpdate
 
 app = Flask(__name__)
 config = dict(dotenv_values('.env'))
-dispositionProEndpoint = '/v2/tables/DP_Payment_Logs/records'
-ENVIRONMENT = "Prod"
 gunicorn_logger = logging.getLogger('gunicorn.error')
 app.logger.handlers = gunicorn_logger.handlers
 app.logger.setLevel(gunicorn_logger.level)
 
 
-def DP_invoice_paid(invoiceObject: dict, stripeAPI: Stripe_API, caspioAPI: Caspio_API):
+def DP_invoice_paid(invoiceObject: dict, endpoint: str, stripeAPI: Stripe_API, caspioAPI: Caspio_API):
     """The Main logic for the invoice.paid trigger coming from Stripe.
 
     Args:
@@ -35,7 +33,7 @@ def DP_invoice_paid(invoiceObject: dict, stripeAPI: Stripe_API, caspioAPI: Caspi
         }
         app.logger.info(f"Invoice ID: {invoiceObject['id']} | Amount Due: {invoiceObject['amount_due']} | Amount Paid: {invoiceObject['amount_paid']} | Payload: {UserPayload}")
         try:
-            response = caspioAPI.mergeUser(data=UserPayload, endpoint=dispositionProEndpoint)
+            response = caspioAPI.mergeUser(data=UserPayload, endpoint=endpoint)
 
             if response.status_code in {200, 201}:
                 app.logger.info("MERGE SUCCESS")
@@ -49,7 +47,7 @@ def DP_invoice_paid(invoiceObject: dict, stripeAPI: Stripe_API, caspioAPI: Caspi
     else:
         app.logger.info("Do Not Change Units No Charge")
 
-def DP_customer_subscription_deleted(subscriptionObject: dict, caspioAPI: Caspio_API):
+def DP_customer_subscription_deleted(subscriptionObject: dict, endpoint: str, caspioAPI: Caspio_API):
     """The Main logic for the customer.subscription.deleted trigger coming from Stripe.
 
     Args:
@@ -59,7 +57,7 @@ def DP_customer_subscription_deleted(subscriptionObject: dict, caspioAPI: Caspio
     UserPayload = {"Status": subscriptionObject['status']}
     app.logger.info(f"CustomerID: {subscriptionObject['customer']} | Payload: {UserPayload}")
     try:
-        response = caspioAPI.updateUser(data=UserPayload, endpoint=dispositionProEndpoint, customerID=subscriptionObject['customer'])
+        response = caspioAPI.updateUser(data=UserPayload, endpoint=endpoint, customerID=subscriptionObject['customer'])
         if response.status_code == 200:
             app.logger.info("UPDATE SUCCESS")
         else:
@@ -71,7 +69,7 @@ def DP_customer_subscription_deleted(subscriptionObject: dict, caspioAPI: Caspio
     except Exception as e:
         app.logger.error(e)
 
-def DP_customer_subscription_updated(subscriptionObject: dict, caspioAPI: Caspio_API):
+def DP_customer_subscription_updated(subscriptionObject: dict, endpoint: str, caspioAPI: Caspio_API):
     """The Main logic for the DispositionPro customer.subscription.updated trigger coming from Stripe.
 
     Args:
@@ -88,7 +86,7 @@ def DP_customer_subscription_updated(subscriptionObject: dict, caspioAPI: Caspio
         UserPayload = {"EndDate": ""}
     app.logger.info(f"CustomerID: {subscriptionObject['customer']} | Payload: {UserPayload}")
     try:
-        response = caspioAPI.updateUser(customerID=subscriptionObject['customer'], data=UserPayload, endpoint=dispositionProEndpoint)
+        response = caspioAPI.updateUser(customerID=subscriptionObject['customer'], data=UserPayload, endpoint=endpoint)
         if response.status_code == 200:
             app.logger.info("UPDATE SUCCESS")
         else:
@@ -100,13 +98,15 @@ def DP_customer_subscription_updated(subscriptionObject: dict, caspioAPI: Caspio
 
 @app.route('/', methods=['GET'])
 def homePage():
+    ENVIRONMENT = "Prod"
     return render_template(f'index{ENVIRONMENT}.html')
 
 
 @app.route('/live/dispositionPro/subscriptions', methods=['POST'])
 def dispositionProSubscriptions():
-    """Main listening endpoint for STRIPE Disposition Pro DEV webhook."""
-
+    """Main listening endpoint for STRIPE Disposition Pro PROD webhook."""
+    dispositionProEndpoint = '/v2/tables/DP_Payment_Logs/records'
+    ENVIRONMENT = "Prod"
     stripeAPI = Stripe_API(secretKey=config[f"stripeDispositionProSecretKey{ENVIRONMENT}"])
     caspioAPI = Caspio_API()
     stripe.api_key = config[f"stripeDispositionProSecretKey{ENVIRONMENT}"]
@@ -134,11 +134,52 @@ def dispositionProSubscriptions():
 
     match event['type']:
         case 'customer.subscription.deleted':
-            DP_customer_subscription_deleted(subscriptionObject=event['data']['object'], caspioAPI=caspioAPI)
+            DP_customer_subscription_deleted(subscriptionObject=event['data']['object'], endpoint=dispositionProEndpoint, caspioAPI=caspioAPI)
         case 'invoice.paid':
-            DP_invoice_paid(invoiceObject=event['data']['object'], caspioAPI=caspioAPI, stripeAPI=stripeAPI)
+            DP_invoice_paid(invoiceObject=event['data']['object'], endpoint=dispositionProEndpoint, caspioAPI=caspioAPI, stripeAPI=stripeAPI)
         case 'customer.subscription.updated':
-            DP_customer_subscription_updated(subscriptionObject=event['data']['object'], caspioAPI=caspioAPI)
+            DP_customer_subscription_updated(subscriptionObject=event['data']['object'], endpoint=dispositionProEndpoint, caspioAPI=caspioAPI)
+
+
+    return {'status': 'accepted', 'message': 'Webhook Accepted'}, 200
+
+@app.route('/test/dispositionPro/subscriptions', methods=['POST'])
+def test_dispositionProSubscriptions():
+    """Test listening endpoint for STRIPE Disposition Pro DEV webhook."""
+    dispositionProEndpoint = '/v2/tables/Python_DP_PaymentLogs/records'
+    ENVIRONMENT = "Dev"
+    stripeAPI = Stripe_API(secretKey=config[f"stripeDispositionProSecretKey{ENVIRONMENT}"])
+    caspioAPI = Caspio_API()
+    stripe.api_key = config[f"stripeDispositionProSecretKey{ENVIRONMENT}"]
+    endpoint_secret = config[f"stripeDispositionProSigningSecret{ENVIRONMENT}"]
+    event = None
+    payload = request.data
+    sig_header = request.headers['STRIPE_SIGNATURE']
+
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, endpoint_secret
+        )
+    except ValueError as e:
+        # Invalid payload
+        app.logger.warning(e)
+        app.logger.warning(f'Invalid Payload From: {request.remote_addr}')
+        return {'status': 'error', 'message': 'Invalid payload'}, 400
+
+    except stripe.error.SignatureVerificationError as e:
+        # Invalid signature
+        app.logger.warning(e)
+        app.logger.warning(f'Invalid Stripe Signature from: {request.remote_addr}')
+        return {'status': 'error', 'message': 'Invalid signature'}, 400
+
+
+    match event['type']:
+        case 'customer.subscription.deleted':
+            DP_customer_subscription_deleted(subscriptionObject=event['data']['object'], endpoint=dispositionProEndpoint, caspioAPI=caspioAPI)
+        case 'invoice.paid':
+            DP_invoice_paid(invoiceObject=event['data']['object'], endpoint=dispositionProEndpoint, caspioAPI=caspioAPI, stripeAPI=stripeAPI)
+        case 'customer.subscription.updated':
+            DP_customer_subscription_updated(subscriptionObject=event['data']['object'], endpoint=dispositionProEndpoint, caspioAPI=caspioAPI)
 
 
     return {'status': 'accepted', 'message': 'Webhook Accepted'}, 200
