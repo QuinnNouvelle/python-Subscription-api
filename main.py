@@ -178,7 +178,7 @@ def dispositionProSubscriptions():
 @app.route('/test/dispositionPro/subscriptions', methods=['POST'])
 def test_dispositionProSubscriptions():
     """Test listening endpoint for STRIPE Disposition Pro DEV webhook."""
-    dispositionProEndpoint = '/v2/tables/DP_Payment_Logs/records'
+    dispositionProEndpoint = '/v2/tables/Python_DP_PaymentLogs/records'
     ENVIRONMENT = "Dev"
     stripeAPI = Stripe_API(secretKey=config[f"stripeDispositionProSecretKey{ENVIRONMENT}"])
     caspioAPI = Caspio_API()
@@ -219,7 +219,7 @@ def test_dispositionProSubscriptions():
 @app.route('/test/titlePro/subscriptions', methods=['POST'])
 def test_titleProSubscriptions():
     """Test listening endpoint for STRIPE TitlePro DEV webhook."""
-    titleProEndpoint = '/v2/tables/Python_Dev_TitlePro_PaymentLogs/records'
+    titleProEndpoint = '/v2/tables/TitlePro_PaymentLogs/records'
     ENVIRONMENT = "Dev"
     stripeAPI = Stripe_API(secretKey=config[f"stripeTitleProSecretKey{ENVIRONMENT}"])
     caspioAPI = Caspio_API()
@@ -257,7 +257,7 @@ def test_titleProSubscriptions():
 
 @app.route('/live/titlePro/subscriptions', methods=['POST'])
 def titleProSubscriptions():
-    """Live listening endpoint for STRIPE TitlePro PROD webhook."""
+    """Live listening endpoint for STRIPE TitlePro DEV webhook."""
     titleProEndpoint = '/v2/tables/TitlePro_PaymentLogs/records'
     ENVIRONMENT = "Prod"
     stripeAPI = Stripe_API(secretKey=config[f"stripeTitleProSecretKey{ENVIRONMENT}"])
