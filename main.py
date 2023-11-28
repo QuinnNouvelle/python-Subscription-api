@@ -178,7 +178,7 @@ def dispositionProSubscriptions():
 @app.route('/test/dispositionPro/subscriptions', methods=['POST'])
 def test_dispositionProSubscriptions():
     """Test listening endpoint for STRIPE Disposition Pro DEV webhook."""
-    dispositionProEndpoint = '/v2/tables/Python_DP_PaymentLogs/records'
+    dispositionProEndpoint = '/v2/tables/DP_Payment_Logs/records'
     ENVIRONMENT = "Dev"
     stripeAPI = Stripe_API(secretKey=config[f"stripeDispositionProSecretKey{ENVIRONMENT}"])
     caspioAPI = Caspio_API()
