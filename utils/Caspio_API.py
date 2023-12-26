@@ -1,7 +1,6 @@
 import base64
 import json
 import requests
-from flask import current_app
 from dotenv import dotenv_values
 
 class NoUsersToUpdate(Exception):
