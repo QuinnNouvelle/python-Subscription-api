@@ -22,7 +22,6 @@ class Caspio_API:
         pair specified in 'tokens'.
 
         Args:
-            self (object): Caspio_API Instance.
             tokens (dict): Key:Value Pairs of tokens that need updated.
         """
         envPath = ".env"
@@ -49,8 +48,6 @@ class Caspio_API:
     def _get_BearerAccessToken(self) -> requests.Response:
         """Private Function. Requests _BearerAccessToken from Caspio. Gets A new BAT and Refresh token from Caspio
         Only Updates .env variables when response.status_code = 200.
-        Args:
-            self (object): Caspio_API Instance.
 
         Returns:
             requests.Response: The Response <Response> object, which contains a server's response to an HTTP request.
@@ -58,10 +55,7 @@ class Caspio_API:
 
 
         postData = f"grant_type=client_credentials&client_id={self._clientID}&client_secret={self._clientSecret}"
-        try:
-            response = requests.post(self._accessTokenURL,data=postData, timeout=10)
-        except Exception as e:
-            current_app.logger.error(e)
+        response = requests.post(self._accessTokenURL,data=postData, timeout=10)
 
         if response.status_code == 200:
             jsonData = json.loads(response.text)
@@ -78,8 +72,6 @@ class Caspio_API:
     def _refresh_BearerAccessToken(self):
         """Private Function.  Uses the Caspio Refresh token to refresh the Caspio Bearer Access Token. 
         https://howto.caspio.com/web-services-api/rest-api/authenticating-rest/
-        Args:
-            self (object): Caspio_API Instance.
         """
         dataToEncode = f"{self._clientID}:{self._clientSecret}"
         binaryData = dataToEncode.encode("utf-8")
@@ -91,11 +83,7 @@ class Caspio_API:
         }
 
         postData = f"grant_type=refresh_token&refresh_token={self._refreshToken}"
-        try:
-            response = requests.post(self._accessTokenURL,data=postData, headers=headers, timeout=10)
-        except Exception as e:
-            response = requests.Response()
-            current_app.logger.error(e)
+        response = requests.post(self._accessTokenURL,data=postData, headers=headers, timeout=10)
 
         if (response.status_code == 400):
             self._get_BearerAccessToken()
@@ -112,7 +100,6 @@ class Caspio_API:
         """Simple GET Request to Caspio API.
 
         Args:
-            self (object): Caspio_API Instance.
             endpoint (str): endpoint of GET request.
 
         Returns:
@@ -122,14 +109,11 @@ class Caspio_API:
             "Authorization": f"bearer {self._bearerAccessToken}",
             "Content-Type": "application/json"
         }
-        try:
-            if qWhere:
-                response = requests.get(f"{self._apiURL}{endpoint}?q.where={qWhere}",headers=headers, timeout=10)
-            else:
-                response = requests.get(self._apiURL+ endpoint,headers=headers, timeout=10)
-        except Exception as e:
-            response = requests.Response()
-            current_app.logger.error(e)
+        
+        if qWhere:
+            response = requests.get(f"{self._apiURL}{endpoint}?q.where={qWhere}",headers=headers, timeout=10)
+        else:
+            response = requests.get(self._apiURL+ endpoint,headers=headers, timeout=10)
 
         if response.status_code == 401:
             self._refresh_BearerAccessToken()
@@ -142,7 +126,6 @@ class Caspio_API:
         and an identifier for the row being changed.
 
         Args:
-            self (object): Caspio_API Instance.
             endpoint (str): url endpoint of put request.
             data (dict): Key:Value pairs of the information being updated.
             qWhere (str): Identifier for the line being changed ex: qWhere = f"PaymentID={record['PaymentID']}".
@@ -155,11 +138,7 @@ class Caspio_API:
             "Content-Type": "application/json"
         }
         JSONData = json.dumps(data)
-        try:
-            response = requests.put(f"{self._apiURL}{endpoint}?q.where={qWhere}",headers=headers, data=JSONData, timeout=10)
-        except Exception as e:
-            response = requests.Response()
-            current_app.logger.error(e)
+        response = requests.put(f"{self._apiURL}{endpoint}?q.where={qWhere}",headers=headers, data=JSONData, timeout=10)
 
 
         if response.status_code == 401:
@@ -172,7 +151,6 @@ class Caspio_API:
         """Simple POST request to specified endpoint.
 
         Args:
-            self (object): Caspio_API Instance
             endpoint (str): url endpoint of POST request.
             data (dict): Dictionary of data passed into the POST request.
 
@@ -184,11 +162,7 @@ class Caspio_API:
             "Content-Type": "application/json"
         }
         JSONData = json.dumps(data)
-        try:
-            response = requests.post(self._apiURL + endpoint,headers=headers, data=JSONData, timeout=10)
-        except Exception as e:
-            response = requests.Response()
-            current_app.logger.error(e)
+        response = requests.post(self._apiURL + endpoint,headers=headers, data=JSONData, timeout=10)
 
         if response.status_code == 401:
             self._refresh_BearerAccessToken()
@@ -200,7 +174,6 @@ class Caspio_API:
         """Simple DEL request to specified endpoint.
 
         Args:
-            self (object): Caspio_API Instance
             endpoint (str): url endpoint of DEL request.
 
         Returns: 
@@ -210,12 +183,7 @@ class Caspio_API:
             "Authorization": f"bearer {self._bearerAccessToken}",
             "Content-Type": "application/json"
         }
-        try:
-            response = requests.delete(f"{self._apiURL}{endpoint}?q.where={qWhere}",headers=headers, timeout=10)
-        except Exception as e:
-            response = requests.Response()
-            current_app.logger.error(e)
-            
+        response = requests.delete(f"{self._apiURL}{endpoint}?q.where={qWhere}",headers=headers, timeout=10)
 
         if response.status_code == 401:
             self._refresh_BearerAccessToken()
