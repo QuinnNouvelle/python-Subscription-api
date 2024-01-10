@@ -59,7 +59,7 @@ def TP_invoice_paid(invoiceObject: dict, stripeAPI: Stripe_API, endpoint: str, c
         subscriptionObject = stripeAPI.getSubscriptionObject(invoiceObject['subscription'])
         try:
             quantity = subscriptionObject['quantity']
-        except ValueError:
+        except KeyError:
             quantity = 1
         UserPayload = {
             'Email': invoiceObject['customer_email'],
