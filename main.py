@@ -57,10 +57,14 @@ def TP_invoice_paid(invoiceObject: dict, stripeAPI: Stripe_API, endpoint: str, c
     """
     if invoiceObject['amount_due'] > 0:
         subscriptionObject = stripeAPI.getSubscriptionObject(invoiceObject['subscription'])
+        try:
+            quantity = subscriptionObject['quantity']
+        except ValueError:
+            quantity = 1
         UserPayload = {
             'Email': invoiceObject['customer_email'],
             'CustomerID': invoiceObject['customer'],
-            'Purchased_Seats': subscriptionObject['quantity'],
+            'Purchased_Seats': quantity,
             'Status': subscriptionObject['status']
         }
         app.logger.info(f"Invoice ID: {invoiceObject['id']} | Amount Due: {invoiceObject['amount_due']} | Amount Paid: {invoiceObject['amount_paid']} | Payload: {UserPayload}")
