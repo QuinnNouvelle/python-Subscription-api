@@ -2,6 +2,10 @@ import json
 import requests
 # The library needs to be configured with your account's secret key.
 # Ensure the key is kept out of any version control system you might be using.
+class FailedGetRequest(Exception):
+    """Throws when get request is not 200, or 201"""
+
+
 
 class Stripe_API:
 
@@ -14,14 +18,15 @@ class Stripe_API:
         Args: endpoint (str): url endpoint of api get request
         Returns: dict: Json response data turned into a dict.
         """
-        try:
-            response = requests.get(f"https://api.stripe.com/{endpoint}", headers=self.headers, timeout=10)
+        
+        response = requests.get(f"https://api.stripe.com/{endpoint}", headers=self.headers, timeout=10)
+        if response.status_code in (200):
             return dict(json.loads(response.text))
-        except Exception as e:
-            return {"Error": True, "Exception" : e}
+        raise FailedGetRequest(f"{response.status_code} : {response.text}")
             
     def getSubscriptionObject(self, subscriptionID: str) -> dict:
         """Perform a Get request to /v1/subscriptions/id
+        https://stripe.com/docs/api/subscriptions/object
 
         Args: subscriptionID (str): ID of the Stripe Subscription Object
         Returns: dict: Json response data turned into a dict.
