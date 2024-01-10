@@ -20,7 +20,7 @@ class Stripe_API:
         """
         
         response = requests.get(f"https://api.stripe.com/{endpoint}", headers=self.headers, timeout=10)
-        if response.status_code in (200):
+        if response.status_code == 200:
             return dict(json.loads(response.text))
         raise FailedGetRequest(f"{response.status_code} : {response.text}")
             
